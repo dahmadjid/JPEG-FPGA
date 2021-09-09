@@ -31,7 +31,6 @@ def float_bin(number, places = 3):
   
     # split() seperates whole number and decimal 
     # part and stores it in two seperate variables
-    
     whole, dec = str(number).split(".")
 
     # Convert both whole number and decimal  
@@ -39,12 +38,12 @@ def float_bin(number, places = 3):
     whole = int(whole)
     
     dec = int (dec)
-  
+
     # Convert the whole number part to it's
     # respective binary form and remove the
     # "0b" from it.
     res = bin(whole).lstrip("0b") + "."
-    
+   
     # Iterate the number of times, we want
     # the number of decimal places to be
     for x in range(places):
@@ -52,8 +51,12 @@ def float_bin(number, places = 3):
         # Multiply the decimal value by 2 
         # and seperate the whole number part
         # and decimal part
-        whole, dec = str((decimal_converter(dec)) * 2).split(".")
-  
+        try:
+            whole, dec = str((decimal_converter(dec)) * 2).split(".")
+        except:
+            whole = '0'
+            dec = 0
+            #print(str((decimal_converter(dec)) * 2).split(".")) 
         # Convert the decimal part
         # to integer again
         dec = int(dec)
@@ -61,7 +64,7 @@ def float_bin(number, places = 3):
         # Keep adding the integer parts 
         # receive to the result variable
         res += whole
-   
+        
     return res
 
 def twosComp(bin_str):
@@ -79,21 +82,25 @@ countlist = ["000","001","010","011","100","101","110","111"]
 
 code = "cos <="
 i,j = 0,0
-for u in countlist:
-    for x in countlist:
-        
-        cos = round(math.cos((2*i+1)*j*math.pi/16),3)
-        if cos == 1.0:
-            code += '"010000000000000000"' + ' when "'+u+x+'",\n'
-        elif cos == -1.0:
-            code += '"110000000000000000"' + ' when "'+u+x+'",\n'
-        elif cos < 0:
-            code += '"'+twosComp('00'+float_bin(cos,places=16)[1:]) + '" when "'+u+x+'",\n'
-        else:
-            code += '"00'+float_bin(cos,places=16)[1:] + '" when "'+u+x+'",\n'
-        i += 1
-    j += 1
-print(code)
+for v in range(8):
+    for y in range(8):
+        cos_y = math.cos((2*y+1)*v*math.pi/16)
+        try:
+            cos = round(cos_y,3)
+            if cos == 1.0:
+                code += '"010000000000000000"' + ' when "'+countlist[v] + countlist[y] +'",\n'
+            elif cos == -1.0:
+                code += '"110000000000000000"' + ' when "'+countlist[v] + countlist[y] +'",\n'
+            elif cos < 0:
+                code += '"'+twosComp('00'+float_bin(cos,places=16)[1:]) + '" when "'+countlist[v] + countlist[y] +'",\n'
+            else:
+                code += '"00'+float_bin(cos,places=16)[1:] + '" when "'+countlist[v] + countlist[y] +'",\n'
+        except:
+            print(v," ",u," ",y," ",x, "   " , cos)
+            
+
 with open("cos.txt","w") as f:
     f.write(code)
 # 2 bit whole (2's comp),16bit decimal part (1 downto -16)
+
+print(float_bin(0.5,16))
