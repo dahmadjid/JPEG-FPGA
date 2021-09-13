@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-
+--Tested on FPGA
 entity spi_master is
   port (
     clock :in std_logic;
@@ -56,6 +56,7 @@ begin
         end if; 
    end if ;
 end process ; -- delay
+
 end_delay : process(clock,end_delay_count,transmission_over,bit_count)
 begin
     if bit_count /= 8  then
@@ -125,7 +126,7 @@ begin
         mosi_busy <= '1';
         data_tx_reg <= std_logic_vector(data_tx_s(7 downto 0));
     elsif rising_edge(sck_s) and mosi_busy = '1' then
-        data_tx_reg <= data_tx_reg(6 downto 0)&0;
+        data_tx_reg <= data_tx_reg(6 downto 0)&'0';
     end if; 
 
 end process ; -- mosi
