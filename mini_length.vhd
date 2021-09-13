@@ -3,6 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 library ieee_proposed;
 use ieee_proposed.fixed_pkg.all;
+--Tested on FPGA
 entity mini_length is
     port 
     (
@@ -20,6 +21,7 @@ architecture arch of mini_length is
 begin
     with dct_coeff(10) select
         temp <= resize(not dct_coeff + 1,10,0) when '1', dct_coeff when others;
+    temp2 <= not temp when dct_coeff(10) = '1' else temp;
     length_temp <=   
         "1011" when temp(10) = '1' else
         "1010" when temp(9) = '1' else
@@ -33,7 +35,7 @@ begin
         "0010" when temp(1) = '1' else
         "0001" when temp(0) = '1' else
         "0000" when temp(0) = '0';
-    temp2 <= not temp when dct_coeff(10) = '1' else temp;
+   
 process(dct_coeff,temp2,length_temp)
 begin
     if length_temp = "0000" then
