@@ -38,31 +38,33 @@ def twosComp(bin_str):
 
 
 mif = "DEPTH = 262144;\nWIDTH = 8;\nADDRESS_RADIX = UNS;\nDATA_RADIX = BIN;\nCONTENT BEGIN\n"
-img = cv2.imread("8x8.bmp")
+img = cv2.imread("img.bmp")
+width = img.shape[1]
+print(img[0,:64,2])
 r,g,b = img[:,:,2],img[:,:,1],img[:,:,0]
 for i in range(len(r)):
     for j in range(len(r[0])):
 
-        address = str(i*8+j)
+        address = str(i*width+j)
         data = bin(r[i,j])[2:].zfill(8)
         line = address+' : '+data+";\n"
         mif+= line
 
-last = i*8+j
+last = i*width+j
 
 for i in range(len(g)):
     for j in range(len(g[0])):
 
-        address = str(i*8+j+last+1)
-        data = bin(r[i,j])[2:].zfill(8)
+        address = str(i*width+j+last+1)
+        data = bin(g[i,j])[2:].zfill(8)
         line = address+' : '+data+";\n"
         mif+= line
 
 for i in range(len(b)):
     for j in range(len(b[0])):
 
-        address = str(i*8+j+last*2+2)
-        data = bin(r[i,j])[2:].zfill(8)
+        address = str(i*width+j+last*2+2)
+        data = bin(b[i,j])[2:].zfill(8)
         line = address+' : '+data+";\n"
         mif+= line
 
@@ -82,23 +84,23 @@ for i in range(len(img)):
             print("FUCK")
 
 mif = "DEPTH = 262144;\nWIDTH = 8;\nADDRESS_RADIX = UNS;\nDATA_RADIX = BIN;\nCONTENT BEGIN\n"
-r,g,b = img[:,:,0],img[:,:,1],img[:,:,2]
-print(r)
+r,g,b = img[:,:,0],img[:,:,1],img[:,:,2]  
+print(g)
 for i in range(len(r)):
     for j in range(len(r[0])):
 
-        address = str(i*8+j)
+        address = str(i*width+j)
         data = bin(abs(r[i,j]))[2:].zfill(8)
         if r[i,j] < 0:
             data = twosComp(data)
         line = address+' : '+data+" "+str(r[i,j])+";\n"
         mif+= line
 
-last = i*8+j
+last = i*width+j
 for i in range(len(g)):
     for j in range(len(g[0])):
 
-        address = str(i*8+j+last+1)
+        address = str(i*width+j+last+1)
         data = bin(abs(g[i,j]))[2:].zfill(8)
         if g[i,j] < 0:
             data = twosComp(data)
@@ -108,7 +110,7 @@ for i in range(len(g)):
 for i in range(len(b)):
     for j in range(len(b[0])):
 
-        address = str(i*8+j+last*2+2)
+        address = str(i*width+j+last*2+2)
         data = bin(abs(b[i,j]))[2:].zfill(8)
         if b[i,j] < 0:
             data = twosComp(data)
