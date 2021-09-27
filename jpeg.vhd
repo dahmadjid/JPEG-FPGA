@@ -5,8 +5,6 @@ use ieee.std_logic_textio.all;
 library ieee_proposed;
 use ieee_proposed.fixed_pkg.all;
 use work.jpeg_pkg.all;
-library std;
-use std.textio.all;
 
 entity jpeg is
 generic (width : natural := 256;
@@ -19,11 +17,11 @@ port(clock,start : in std_logic;
 end jpeg;   
 
 architecture arch of jpeg is
-    type state_t is (idle,converting,dct);
+    type state_t is (idle,converting,dct,encoding);
     signal address : std_logic_vector(17 downto 0);
     signal address_bid : integer range 0 to 262144;
-    shared variable address_rgb_ycbcr,address_dct : std_logic_vector(17 downto 0);
-    shared variable data_rgb_ycbcr,data_dct : std_logic_vector(7 downto 0);
+    shared variable address_rgb_ycbcr,address_dct,address_encoding : std_logic_vector(17 downto 0);
+    shared variable data_rgb_ycbcr,data_dct,data_encoding : std_logic_vector(7 downto 0);
     signal v,u : unsigned(2 downto 0);
     signal rw_counter : integer range 0 to 11:= 0; 
     --read write counter for 0-11 read : r,g,b and then 6-11 :write y,cb,cr even are for addressing and odd for reading q. dct_clock cant be 50mhz. slow but it works idc at this point.
@@ -34,7 +32,7 @@ architecture arch of jpeg is
     signal image_index_count,index_count : integer range 0 to 49151:= 0;
     shared variable r,g,b : unsigned(7 downto 0):= "00000000";
     signal y,cb,cr,y_reg,cb_reg,cr_reg : sfixed(7 downto 0);
-    signal wren,wren_rgb_ycbcr,wren_dct,image_converted,image_index_clock,clock_delay: std_logic := '0';
+    signal wren,wren_rgb_ycbcr,wren_dct,image_converted,image_index_clock,clock_delay,wren_encoding,encoding_done: std_logic := '0';
     signal data,q,converting_data_out : std_logic_vector(7 downto 0);
     signal jpeg_start,dct_working: std_logic := '0';
     shared variable img_pixel : sfixed(7 downto 0);
@@ -45,7 +43,10 @@ architecture arch of jpeg is
     signal block_index_count : integer range 0 to 1024 := 0;
     signal dct_start : std_logic:= '1'; 
     signal y_x_index : unsigned(5 downto 0);
-
+    signal dct_coeff_zz : dct_coeff_zz_t;
+    signal huff_value_zz : dct_coeff_zz_t; 
+    signal length_zz : length_zz_t;
+    signal old_dc_reg : sfixed(10 downto 0) := "00000000000";
 begin
 -- clock_delay <= not clock_delay_n;
 --jpeg_start_pr : process( start )
@@ -180,6 +181,7 @@ y_quant_comp : y_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
 -- cb_quant_comp : cb_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
 -- cr_quant_comp : cr_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
 bid_comp : block_index_decoder port map(to_unsigned(index_count,6),0,0,width,height,0,address_bid);
+zigzag_comp : zigzag port map(dct_coeff_block_qz,dct_coeff_zz);
 process(clock)
 begin
     address_dct := std_logic_vector(to_unsigned(address_bid,18));
@@ -210,7 +212,6 @@ begin
             case dct_read_counter is
                 when 0 =>
                     wren_dct <= '0';
-                    
                     dct_clock <= '0';
                     dct_read_counter <= 1;
                 when 1 => 
@@ -222,6 +223,20 @@ begin
         end if;     
     end if; 
 end process ; -- pixel_process
+-------------------------------------------------------------------------------------------
+-------------------------------------ENCODING STATE----------------------------------------
+mini_length_comp : mini_length_block port map(dct_coeff_zz(0) - old_dc_reg,dct_coeff_zz,huff_value_zz,length_zz);
+old_dc_reg_pr : process( encoding_done,present_state )
+begin  
+    if present_state = idle then
+        old_dc_reg <= "00000000000";
+    elsif rising_edge(encoding_done) then
+        old_dc_reg <= dct_coeff_zz(0);
+    end if;
+    
+end process ; -- old_dc_reg_pr
+
+
 -------------------------------------------------------------------------------------------
 present_state_pr : process(clock_delay)
     begin
@@ -254,7 +269,13 @@ next_state_pr : process(present_state,image_converted)
                 if dct_working = '1' then
                     next_state <= dct;
                 else
-                    next_state <= idle;
+                    next_state <= encoding;
+                end if;
+            when encoding =>
+                if encoding_done = '1' then
+                    next_state <= dct;
+                else
+                    next_state <= encoding;
                 end if;
         end case;
 end process;
@@ -288,11 +309,16 @@ begin
             data_out <= dct_working&std_logic_vector(to_unsigned(index_count,6))&dct_clock;
             dct_start <= '0';
             img_pixel := sfixed(q);
+        when encoding =>
+            address <= address_encoding;
+            data <= data_encoding;
+            wren <= wren_encoding;
+            dct_start <= '1';
     end case;
 end process;
 hex_out <= dct_coeff_block when data_in(7 downto 6) = "00" else dct_coeff_block_qz;
 --with hex_out(to_integer(v))(to_integer(u))(3 downto 0) select hex_1 <=
-with hex_out(to_integer(v))(to_integer(u))(3 downto 0) select hex_1 <=
+with dct_coeff_zz(to_integer(v&u))(3 downto 0) select hex_1 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -311,7 +337,7 @@ with hex_out(to_integer(v))(to_integer(u))(3 downto 0) select hex_1 <=
     "0001110" when "1111",
     "1111111" when others;	
 --with hex_out(to_integer(v))(to_integer(u))(7 downto 4) select hex_2 <=
-with hex_out(to_integer(v))(to_integer(u))(7 downto 4) select hex_2 <=
+with dct_coeff_zz(to_integer(v&u))(7 downto 4) select hex_2 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -329,7 +355,7 @@ with hex_out(to_integer(v))(to_integer(u))(7 downto 4) select hex_2 <=
     "0000110" when "1110",
     "0001110" when "1111",
     "1111111" when others;
-with hex_out(to_integer(v))(to_integer(u))(10 downto 8) select hex_3 <=
+with dct_coeff_zz(to_integer(v&u))(10 downto 8) select hex_3 <=
     "1000000" when "000",	
     "1111001" when "001",	
     "0100100" when "010", 	 

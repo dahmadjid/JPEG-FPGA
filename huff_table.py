@@ -1,11 +1,41 @@
-zigzag = [[0, 1, 5, 6, 14, 15, 27, 28],
-	[2, 4, 7, 13, 16, 26, 29, 42],
-	[3, 8, 12, 17, 25, 30, 41, 43],
-	[9, 11, 18, 24, 31, 40, 44, 53],
-	[10, 19, 23, 32, 39, 45, 52, 54],
-	[20, 22, 33, 38, 46, 51, 55, 60],
-	[21, 34, 37, 47, 50, 56, 59, 61],
-	[35, 36, 48, 49, 57, 58, 62, 63]]
+import numpy as np
+
+# test =[[(j,i) for i in range(8) ] for j in range(8)]
+# zigzag = np.array([
+#     [0, 1, 5, 6, 14, 15, 27, 28],
+# 	[2, 4, 7, 13, 16, 26, 29, 42],
+# 	[3, 8, 12, 17, 25, 30, 41, 43],
+# 	[9, 11, 18, 24, 31, 40, 44, 53],
+# 	[10, 19, 23, 32, 39, 45, 52, 54],
+# 	[20, 22, 33, 38, 46, 51, 55, 60],
+# 	[21, 34, 37, 47, 50, 56, 59, 61],
+# 	[35, 36, 48, 49, 57, 58, 62, 63]])
+# print(test)
+# zigzag = zigzag.reshape(64)
+
+# print(zigzag)
+# new = [0 for i in range(64)]
+# i = 0
+# test = np.array(test).reshape(64,2).tolist()
+# for index in zigzag:
+#     new[index] = test[i]
+#     i += 1
+
+# text = "dct_coeff_zz <= ("
+# for j,i in new:
+#     line = f"dct_coeff_block_qz({j})({i}),"
+#     text += line
+# with open("zigzag.txt" ,"w") as f:
+#     f.write(text)
+# print(new)
+
+
+
+
+ 
+
+
+
 
 HUFFMAN_CATEGORIES = (
     (0, ),
@@ -25,9 +55,10 @@ HUFFMAN_CATEGORIES = (
     (*range(-16383, -8192 + 1), *range(8192, 16383 + 1)),
     (*range(-32767, -16384 + 1), *range(16384, 32767 + 1))
 )
+
 HUFFMAN_CATEGORY_CODEWORD = {
-    DC: {
-        LUMINANCE:{
+    "DC": {
+        "LUMINANCE":{   # 9 bit code length
             0:  '00',
             1:  '010',
             2:  '011',
@@ -39,9 +70,9 @@ HUFFMAN_CATEGORY_CODEWORD = {
             8:  '111110',
             9:  '1111110',
             10: '11111110',
-            11: '111111110'
+            11: '111111110'     
         },
-        CHROMINANCE:{
+        "CHROMINANCE":{  # 11bit code length
             0:  '00',
             1:  '01',
             2:  '10',
@@ -53,17 +84,17 @@ HUFFMAN_CATEGORY_CODEWORD = {
             8:  '11111110',
             9:  '111111110',
             10: '1111111110',
-            11: '11111111110'
+            11: '11111111110'   
         }
     },
-    AC: {
-        LUMINANCE:{
-            EOB: '1010',  # (0, 0)
-            ZRL: '11111111001',  # (F, 0)
+    "AC": { # 16 bit code length 
+        "LUMINANCE":{
+            "EOB": '1010',  # (0, 0)
+            "ZRL": '11111111001',  # (F, 0)
 
             (0, 1):  '00',
             (0, 2):  '01',
-            (0, 3):  '100',
+            (0, 3):  '100', 
             (0, 4):  '1011',
             (0, 5):  '11010',
             (0, 6):  '1111000',
@@ -237,10 +268,10 @@ HUFFMAN_CATEGORY_CODEWORD = {
             (15, 9):  '1111111111111101',
             (15, 10): '1111111111111110'
             },
-        CHROMINANCE:
+        "CHROMINANCE":
             {
-            EOB: '00',  # (0, 0)
-            ZRL: '1111111010',  # (F, 0)
+            "EOB": '00',  # (0, 0)
+            "ZRL": '1111111010',  # (F, 0)
 
             (0, 1):  '01',
             (0, 2):  '100',
@@ -420,3 +451,40 @@ HUFFMAN_CATEGORY_CODEWORD = {
         }
     }
 }
+
+
+text = "("
+for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['LUMINANCE'].items():
+    pair = '("' + code.zfill(9) + '",' + str(len(code)) + "),"
+    text += pair
+text = text[:-1]  + ');\n\n('
+for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['CHROMINANCE'].items():
+    pair = '("' + code.zfill(11) + '",' + str(len(code)) + "),"
+    text += pair
+text = text[:-1]  + ');\n\n(('
+i = 0
+for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['LUMINANCE'].items():
+    if str(length) in "EOBZRL":
+        continue
+    pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
+    text += pair
+    if i == 9: 
+        text = text[:-1] + "),\n("
+        i = 0
+    else:
+        i += 1
+i = 0
+text = text[:-3] + ');\n\n((' 
+for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['CHROMINANCE'].items():
+    if str(length) in "EOBZRL":
+        continue
+    pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
+    text += pair
+    if i == 9: 
+        text = text[:-1] + "),\n("
+        i = 0
+    else:
+        i += 1
+text = text[:-3] + ');\n\n'
+with open("huff_table.txt" ,'w') as f:
+    f.write(text)
