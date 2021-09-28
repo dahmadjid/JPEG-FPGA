@@ -6,6 +6,9 @@ library ieee_proposed;
 use ieee_proposed.fixed_pkg.all;
 use work.jpeg_pkg.all;
 
+
+
+-- convert dct_coeff_zz into a matrix of records and overload + , return the entire code, do the ac process.
 entity jpeg is
 generic (width : natural := 256;
 height : natural := 192   );
@@ -47,6 +50,10 @@ architecture arch of jpeg is
     signal huff_value_zz : dct_coeff_zz_t; 
     signal length_zz : length_zz_t;
     signal old_dc_reg : sfixed(10 downto 0) := "00000000000";
+    signal y_dc_code : y_dc_code_t ;
+    signal y_ac_code : ac_code_t ;
+    signal huff_value : huff_value_t;
+    signal huff_code : huff_code_t;
 begin
 -- clock_delay <= not clock_delay_n;
 --jpeg_start_pr : process( start )
@@ -181,7 +188,7 @@ y_quant_comp : y_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
 -- cb_quant_comp : cb_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
 -- cr_quant_comp : cr_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
 bid_comp : block_index_decoder port map(to_unsigned(index_count,6),0,0,width,height,0,address_bid);
-zigzag_comp : zigzag port map(dct_coeff_block_qz,dct_coeff_zz);
+zigzag_comp : zigzag port map(dct_coeff_block,dct_coeff_zz);
 process(clock)
 begin
     address_dct := std_logic_vector(to_unsigned(address_bid,18));
@@ -224,6 +231,7 @@ begin
     end if; 
 end process ; -- pixel_process
 -------------------------------------------------------------------------------------------
+
 -------------------------------------ENCODING STATE----------------------------------------
 mini_length_comp : mini_length_block port map(dct_coeff_zz(0) - old_dc_reg,dct_coeff_zz,huff_value_zz,length_zz);
 old_dc_reg_pr : process( encoding_done,present_state )
@@ -233,9 +241,11 @@ begin
     elsif rising_edge(encoding_done) then
         old_dc_reg <= dct_coeff_zz(0);
     end if;
-    
 end process ; -- old_dc_reg_pr
 
+y_dc_code <= y_dc_codes(to_integer(length_zz(to_integer(v&u))));
+huff_value<= (std_logic_vector(huff_value_zz(to_integer(v&u))),to_integer(length_zz(to_integer(v&u))));
+huff_code <= y_dc_code + huff_value;
 
 -------------------------------------------------------------------------------------------
 present_state_pr : process(clock_delay)
@@ -279,13 +289,13 @@ next_state_pr : process(present_state,image_converted)
                 end if;
         end case;
 end process;
-
+v <= unsigned(data_in(5 downto 3));
+u <= unsigned(data_in(2 downto 0));
 outputs_fsm_pr : process(present_state)
 begin
     case present_state is 
         when idle => 
-            v <= unsigned(data_in(5 downto 3));
-            u <= unsigned(data_in(2 downto 0));
+            
             address(7 downto 0) <= data_in;
             if start = '1' then  
                 address(17 downto 8) <= (others => '0');
@@ -294,7 +304,7 @@ begin
             end if;
             data <= (others => '0');
             wren <= '0';
-            data_out <= q;
+            data_out <= y_dc_code.code(8)&std_logic_vector(to_unsigned(y_dc_code.code_length,7));
             dct_start <= '1';
         when converting =>
             address <= address_rgb_ycbcr;
@@ -313,12 +323,12 @@ begin
             address <= address_encoding;
             data <= data_encoding;
             wren <= wren_encoding;
-            dct_start <= '1';
+            dct_start <= '0';
     end case;
 end process;
 hex_out <= dct_coeff_block when data_in(7 downto 6) = "00" else dct_coeff_block_qz;
 --with hex_out(to_integer(v))(to_integer(u))(3 downto 0) select hex_1 <=
-with dct_coeff_zz(to_integer(v&u))(3 downto 0) select hex_1 <=
+with huff_code.code(26 downto 23) select hex_1 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -337,7 +347,7 @@ with dct_coeff_zz(to_integer(v&u))(3 downto 0) select hex_1 <=
     "0001110" when "1111",
     "1111111" when others;	
 --with hex_out(to_integer(v))(to_integer(u))(7 downto 4) select hex_2 <=
-with dct_coeff_zz(to_integer(v&u))(7 downto 4) select hex_2 <=
+with huff_code.code(22 downto 19) select hex_2 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -355,18 +365,28 @@ with dct_coeff_zz(to_integer(v&u))(7 downto 4) select hex_2 <=
     "0000110" when "1110",
     "0001110" when "1111",
     "1111111" when others;
-with dct_coeff_zz(to_integer(v&u))(10 downto 8) select hex_3 <=
-    "1000000" when "000",	
-    "1111001" when "001",	
-    "0100100" when "010", 	 
-    "0110000" when "011", 	
-    "0011001" when "100", 	
-    "0010010" when "101", 	
-    "0000010" when "110", 	
-    "1111000" when "111", 	
+--with hex_out(to_integer(v))(to_integer(u))(10 downto 8) select hex_3 <=
+with huff_code.code( 18 downto 15) select hex_3 <=
+    "1000000" when "0000",	
+    "1111001" when "0001",	
+    "0100100" when "0010", 	 
+    "0110000" when "0011", 	
+    "0011001" when "0100", 	
+    "0010010" when "0101", 	
+    "0000010" when "0110", 	
+    "1111000" when "0111", 	
+    "0000000" when "1000", 	
+    "0011000" when "1001", 
+    "0001000" when "1010",    
+    "0000011" when "1011",    
+    "1000110" when "1100",    
+    "0100001" when "1101",
+    "0000110" when "1110",
+    "0001110" when "1111",
     "1111111" when others;
 
-with q(3 downto 0) select hex_4 <= 
+--with q(3 downto 0) select hex_4 <= 
+with huff_code.code(14 downto 11) select hex_4 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -385,7 +405,8 @@ with q(3 downto 0) select hex_4 <=
     "0001110" when "1111",
     "1111111" when others;	
 
-with q(7 downto 4) select hex_5 <= 
+--with q(7 downto 4) select hex_5 <= 
+with huff_code.code(10 downto 7) select hex_5 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 

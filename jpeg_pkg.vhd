@@ -22,25 +22,41 @@ package jpeg_pkg is
     type address_mat_t is array(0 to 7) of address_row_t;
     type dct_coeff_zz_t is array(0 to 63) of sfixed(10 downto 0);
     type length_zz_t is array(0 to 63) of unsigned(3 downto 0);
+
+    type huff_value_t is record  
+    code : std_logic_vector(10 downto 0);
+    code_length : integer range 0 to 11;
+    end record;
+
     type y_dc_code_t is record
         code : std_logic_vector(8 downto 0);
         code_length : integer range 1 to 9;
     end record;
-    type c_dc_code_t is record
+
+    type c_dc_code_t is record  
         code : std_logic_vector(10 downto 0);
         code_length : integer range 1 to 11;
     end record;
+
     type ac_code_t is record
         code : std_logic_vector(15 downto 0);
         code_length : integer range 1 to 16;
     end record;
 
+    type additional_bits_table_t is array(0 to 63) of huff_value_t; --
+
     type y_dc_code_table_t is array(0 to 11) of y_dc_code_t;
     type c_dc_code_table_t is array(0 to 11) of c_dc_code_t;
     
     type ac_code_row_t is array(1 to 10) of ac_code_t;
-    type ac_code_table_t is array(0 to 15) of ac_code_row_t; 
+    type ac_code_table_t is array(0 to 15) of ac_code_row_t;
+    
+    type huff_code_t is record
+        code : std_logic_vector(26 downto 0);
+        code_length : integer range 1 to 27;
+    end record;
 
+    
 
     constant luminance_qz: image_block_t := (
     ("00010000","00001011","00001010","00010000","00011000","00101000","00110011","00111101"),
@@ -121,10 +137,10 @@ package jpeg_pkg is
     (("0011111111100000",14),("1111111111101101",16),("1111111111101110",16),("1111111111101111",16),("1111111111110000",16),("1111111111110001",16),("1111111111110010",16),("1111111111110011",16),("1111111111110100",16),("1111111111110101",16)),
     (("0111111111000011",15),("1111111111110110",16),("1111111111110111",16),("1111111111111000",16),("1111111111111001",16),("1111111111111010",16),("1111111111111011",16),("1111111111111100",16),("1111111111111101",16),("1111111111111110",16)));
     
-    
-
-
-
+    function "+"( y_dc_code : y_dc_code_t; huff_value : huff_value_t) return huff_code_t;
+    function "+" ( c_dc_code : c_dc_code_t; huff_value : huff_value_t) return huff_code_t;
+    function "+" ( ac_code : ac_code_t;  huff_value : huff_value_t) return huff_code_t;
+    function concat(a,b: std_logic_vector ;length_a:integer range 0 to 11;length_b:integer range 1 to 16) return huff_code_t;
     component cos is   
         port 
         (
@@ -229,3 +245,1457 @@ package jpeg_pkg is
         ) ;
     end component;
 end package;
+
+package body jpeg_pkg is 
+
+function concat(a,b: std_logic_vector ;length_a:integer range 0 to 11;length_b:integer range 1 to 16) return huff_code_t is
+    variable huff_code : huff_code_t;
+    begin
+        huff_code.code_length := length_a+length_b;
+        huff_code.code(26 downto 26 - length_a-length_b) := a(length_a - 1 downto 0) &b(length_b - 1 downto 0);
+        return huff_code;
+    end function;
+     
+function "+" (y_dc_code : y_dc_code_t;huff_value : huff_value_t) return huff_code_t is
+        variable huff_code : huff_code_t;
+        begin
+        huff_code.code_length := y_dc_code.code_length + huff_value.code_length;
+        case y_dc_code.code_length is 
+        when 1 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26) := y_dc_code.code(0);
+                huff_code.code(25 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 25) := y_dc_code.code(0)&huff_value.code(0);
+                huff_code.code(24 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 24) := y_dc_code.code(0)&huff_value.code(1 downto 0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 23) := y_dc_code.code(0)&huff_value.code(2 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 22) := y_dc_code.code(0)&huff_value.code(3 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 21) := y_dc_code.code(0)&huff_value.code(4 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 20) := y_dc_code.code(0)&huff_value.code(5 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(0)&huff_value.code(6 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(0)&huff_value.code(7 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(0)&huff_value.code(8 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(0)&huff_value.code(9 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(0)&huff_value.code(10 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+        end case;
+    when 2 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 25) := y_dc_code.code(1 downto 0);
+                huff_code.code(24 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 24) := y_dc_code.code(1 downto 0)&huff_value.code(0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 23) := y_dc_code.code(1 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 22) := y_dc_code.code(1 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 21) := y_dc_code.code(1 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 20) := y_dc_code.code(1 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(1 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(1 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(1 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(1 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(1 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(1 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+        end case;
+    when 3 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 24) := y_dc_code.code(2 downto 0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 23) := y_dc_code.code(2 downto 0)&huff_value.code(0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 22) := y_dc_code.code(2 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 21) := y_dc_code.code(2 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 20) := y_dc_code.code(2 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(2 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(2 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(2 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(2 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(2 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(2 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 13) := y_dc_code.code(2 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+        end case;
+    when 4 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 23) := y_dc_code.code(3 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 22) := y_dc_code.code(3 downto 0)&huff_value.code(0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 21) := y_dc_code.code(3 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 20) := y_dc_code.code(3 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(3 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(3 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(3 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(3 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(3 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(3 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 13) := y_dc_code.code(3 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 12) := y_dc_code.code(3 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+        end case;
+    when 5 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 22) := y_dc_code.code(4 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 21) := y_dc_code.code(4 downto 0)&huff_value.code(0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 20) := y_dc_code.code(4 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(4 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(4 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(4 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(4 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(4 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(4 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 13) := y_dc_code.code(4 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 12) := y_dc_code.code(4 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 11) := y_dc_code.code(4 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+        end case;
+    when 6 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 21) := y_dc_code.code(5 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 20) := y_dc_code.code(5 downto 0)&huff_value.code(0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(5 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(5 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(5 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(5 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(5 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(5 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 13) := y_dc_code.code(5 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 12) := y_dc_code.code(5 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 11) := y_dc_code.code(5 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 10) := y_dc_code.code(5 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+        end case;
+    when 7 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 20) := y_dc_code.code(6 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(6 downto 0)&huff_value.code(0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(6 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(6 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(6 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(6 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(6 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 13) := y_dc_code.code(6 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 12) := y_dc_code.code(6 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 11) := y_dc_code.code(6 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 10) := y_dc_code.code(6 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 9) := y_dc_code.code(6 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+        end case;
+    when 8 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 19) := y_dc_code.code(7 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(7 downto 0)&huff_value.code(0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(7 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(7 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(7 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(7 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 13) := y_dc_code.code(7 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 12) := y_dc_code.code(7 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 11) := y_dc_code.code(7 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 10) := y_dc_code.code(7 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 9) := y_dc_code.code(7 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 8) := y_dc_code.code(7 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+        end case;
+    when 9 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 18) := y_dc_code.code(8 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 17) := y_dc_code.code(8 downto 0)&huff_value.code(0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 16) := y_dc_code.code(8 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 15) := y_dc_code.code(8 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 14) := y_dc_code.code(8 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 13) := y_dc_code.code(8 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 12) := y_dc_code.code(8 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 11) := y_dc_code.code(8 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 10) := y_dc_code.code(8 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 9) := y_dc_code.code(8 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 8) := y_dc_code.code(8 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 7) := y_dc_code.code(8 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+        end case;
+    end case;
+    return huff_code;
+    end function;
+
+
+
+function "+" (c_dc_code : c_dc_code_t;huff_value : huff_value_t) return huff_code_t is
+    variable huff_code : huff_code_t;
+    begin
+    huff_code.code_length := c_dc_code.code_length + huff_value.code_length;
+    case c_dc_code.code_length is 
+
+
+    when 1 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26) := c_dc_code.code(0);
+                huff_code.code(25 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 25) := c_dc_code.code(0)&huff_value.code(0);
+                huff_code.code(24 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 24) := c_dc_code.code(0)&huff_value.code(1 downto 0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 23) := c_dc_code.code(0)&huff_value.code(2 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 22) := c_dc_code.code(0)&huff_value.code(3 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 21) := c_dc_code.code(0)&huff_value.code(4 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 20) := c_dc_code.code(0)&huff_value.code(5 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(0)&huff_value.code(6 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(0)&huff_value.code(7 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(0)&huff_value.code(8 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(0)&huff_value.code(9 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(0)&huff_value.code(10 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+        end case;
+    when 2 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 25) := c_dc_code.code(1 downto 0);
+                huff_code.code(24 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 24) := c_dc_code.code(1 downto 0)&huff_value.code(0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 23) := c_dc_code.code(1 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 22) := c_dc_code.code(1 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 21) := c_dc_code.code(1 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 20) := c_dc_code.code(1 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(1 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(1 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(1 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(1 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(1 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(1 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+        end case;
+    when 3 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 24) := c_dc_code.code(2 downto 0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 23) := c_dc_code.code(2 downto 0)&huff_value.code(0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 22) := c_dc_code.code(2 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 21) := c_dc_code.code(2 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 20) := c_dc_code.code(2 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(2 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(2 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(2 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(2 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(2 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(2 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(2 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+        end case;
+    when 4 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 23) := c_dc_code.code(3 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 22) := c_dc_code.code(3 downto 0)&huff_value.code(0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 21) := c_dc_code.code(3 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 20) := c_dc_code.code(3 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(3 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(3 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(3 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(3 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(3 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(3 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(3 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(3 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+        end case;
+    when 5 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 22) := c_dc_code.code(4 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 21) := c_dc_code.code(4 downto 0)&huff_value.code(0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 20) := c_dc_code.code(4 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(4 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(4 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(4 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(4 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(4 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(4 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(4 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(4 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 11) := c_dc_code.code(4 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+        end case;
+    when 6 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 21) := c_dc_code.code(5 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 20) := c_dc_code.code(5 downto 0)&huff_value.code(0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(5 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(5 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(5 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(5 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(5 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(5 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(5 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(5 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 11) := c_dc_code.code(5 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 10) := c_dc_code.code(5 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+        end case;
+    when 7 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 20) := c_dc_code.code(6 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(6 downto 0)&huff_value.code(0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(6 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(6 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(6 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(6 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(6 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(6 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(6 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 11) := c_dc_code.code(6 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 10) := c_dc_code.code(6 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 9) := c_dc_code.code(6 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+        end case;
+    when 8 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 19) := c_dc_code.code(7 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(7 downto 0)&huff_value.code(0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(7 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(7 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(7 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(7 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(7 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(7 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 11) := c_dc_code.code(7 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 10) := c_dc_code.code(7 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 9) := c_dc_code.code(7 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 8) := c_dc_code.code(7 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+        end case;
+    when 9 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 18) := c_dc_code.code(8 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(8 downto 0)&huff_value.code(0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(8 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(8 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(8 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(8 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(8 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 11) := c_dc_code.code(8 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 10) := c_dc_code.code(8 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 9) := c_dc_code.code(8 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 8) := c_dc_code.code(8 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 7) := c_dc_code.code(8 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+        end case;
+    when 10 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 17) := c_dc_code.code(9 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(9 downto 0)&huff_value.code(0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(9 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(9 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(9 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(9 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 11) := c_dc_code.code(9 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 10) := c_dc_code.code(9 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 9) := c_dc_code.code(9 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 8) := c_dc_code.code(9 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 7) := c_dc_code.code(9 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 6) := c_dc_code.code(9 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+        end case;
+    when 11 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 16) := c_dc_code.code(10 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 15) := c_dc_code.code(10 downto 0)&huff_value.code(0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 14) := c_dc_code.code(10 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 13) := c_dc_code.code(10 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 12) := c_dc_code.code(10 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 11) := c_dc_code.code(10 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 10) := c_dc_code.code(10 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 9) := c_dc_code.code(10 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 8) := c_dc_code.code(10 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 7) := c_dc_code.code(10 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 6) := c_dc_code.code(10 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 5) := c_dc_code.code(10 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(4 downto 0) := (others => '0');
+        end case;
+    end case;
+    return huff_code;
+    end function;
+
+
+function "+" (ac_code : ac_code_t;huff_value : huff_value_t) return huff_code_t is
+
+
+
+        variable huff_code : huff_code_t;
+        begin
+        huff_code.code_length := ac_code.code_length + huff_value.code_length;
+        case ac_code.code_length is 
+        when 1 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26) := ac_code.code(0);
+                huff_code.code(25 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 25) := ac_code.code(0)&huff_value.code(0);
+                huff_code.code(24 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 24) := ac_code.code(0)&huff_value.code(1 downto 0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 23) := ac_code.code(0)&huff_value.code(2 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 22) := ac_code.code(0)&huff_value.code(3 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 21) := ac_code.code(0)&huff_value.code(4 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 20) := ac_code.code(0)&huff_value.code(5 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 19) := ac_code.code(0)&huff_value.code(6 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 18) := ac_code.code(0)&huff_value.code(7 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 17) := ac_code.code(0)&huff_value.code(8 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 16) := ac_code.code(0)&huff_value.code(9 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 15) := ac_code.code(0)&huff_value.code(10 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+        end case;
+    when 2 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 25) := ac_code.code(1 downto 0);
+                huff_code.code(24 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 24) := ac_code.code(1 downto 0)&huff_value.code(0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 23) := ac_code.code(1 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 22) := ac_code.code(1 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 21) := ac_code.code(1 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 20) := ac_code.code(1 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 19) := ac_code.code(1 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 18) := ac_code.code(1 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 17) := ac_code.code(1 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 16) := ac_code.code(1 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 15) := ac_code.code(1 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 14) := ac_code.code(1 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+        end case;
+    when 3 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 24) := ac_code.code(2 downto 0);
+                huff_code.code(23 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 23) := ac_code.code(2 downto 0)&huff_value.code(0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 22) := ac_code.code(2 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 21) := ac_code.code(2 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 20) := ac_code.code(2 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 19) := ac_code.code(2 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 18) := ac_code.code(2 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 17) := ac_code.code(2 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 16) := ac_code.code(2 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 15) := ac_code.code(2 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 14) := ac_code.code(2 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 13) := ac_code.code(2 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+        end case;
+    when 4 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 23) := ac_code.code(3 downto 0);
+                huff_code.code(22 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 22) := ac_code.code(3 downto 0)&huff_value.code(0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 21) := ac_code.code(3 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 20) := ac_code.code(3 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 19) := ac_code.code(3 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 18) := ac_code.code(3 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 17) := ac_code.code(3 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 16) := ac_code.code(3 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 15) := ac_code.code(3 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 14) := ac_code.code(3 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 13) := ac_code.code(3 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 12) := ac_code.code(3 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+        end case;
+    when 5 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 22) := ac_code.code(4 downto 0);
+                huff_code.code(21 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 21) := ac_code.code(4 downto 0)&huff_value.code(0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 20) := ac_code.code(4 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 19) := ac_code.code(4 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 18) := ac_code.code(4 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 17) := ac_code.code(4 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 16) := ac_code.code(4 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 15) := ac_code.code(4 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 14) := ac_code.code(4 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 13) := ac_code.code(4 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 12) := ac_code.code(4 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 11) := ac_code.code(4 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+        end case;
+    when 6 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 21) := ac_code.code(5 downto 0);
+                huff_code.code(20 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 20) := ac_code.code(5 downto 0)&huff_value.code(0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 19) := ac_code.code(5 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 18) := ac_code.code(5 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 17) := ac_code.code(5 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 16) := ac_code.code(5 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 15) := ac_code.code(5 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 14) := ac_code.code(5 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 13) := ac_code.code(5 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 12) := ac_code.code(5 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 11) := ac_code.code(5 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 10) := ac_code.code(5 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+        end case;
+    when 7 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 20) := ac_code.code(6 downto 0);
+                huff_code.code(19 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 19) := ac_code.code(6 downto 0)&huff_value.code(0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 18) := ac_code.code(6 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 17) := ac_code.code(6 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 16) := ac_code.code(6 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 15) := ac_code.code(6 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 14) := ac_code.code(6 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 13) := ac_code.code(6 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 12) := ac_code.code(6 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 11) := ac_code.code(6 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 10) := ac_code.code(6 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 9) := ac_code.code(6 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+        end case;
+    when 8 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 19) := ac_code.code(7 downto 0);
+                huff_code.code(18 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 18) := ac_code.code(7 downto 0)&huff_value.code(0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 17) := ac_code.code(7 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 16) := ac_code.code(7 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 15) := ac_code.code(7 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 14) := ac_code.code(7 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 13) := ac_code.code(7 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 12) := ac_code.code(7 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 11) := ac_code.code(7 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 10) := ac_code.code(7 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 9) := ac_code.code(7 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 8) := ac_code.code(7 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+        end case;
+    when 9 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 18) := ac_code.code(8 downto 0);
+                huff_code.code(17 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 17) := ac_code.code(8 downto 0)&huff_value.code(0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 16) := ac_code.code(8 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 15) := ac_code.code(8 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 14) := ac_code.code(8 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 13) := ac_code.code(8 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 12) := ac_code.code(8 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 11) := ac_code.code(8 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 10) := ac_code.code(8 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 9) := ac_code.code(8 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 8) := ac_code.code(8 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 7) := ac_code.code(8 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+        end case;
+    when 10 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 17) := ac_code.code(9 downto 0);
+                huff_code.code(16 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 16) := ac_code.code(9 downto 0)&huff_value.code(0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 15) := ac_code.code(9 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 14) := ac_code.code(9 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 13) := ac_code.code(9 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 12) := ac_code.code(9 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 11) := ac_code.code(9 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 10) := ac_code.code(9 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 9) := ac_code.code(9 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 8) := ac_code.code(9 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 7) := ac_code.code(9 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 6) := ac_code.code(9 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+        end case;
+    when 11 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 16) := ac_code.code(10 downto 0);
+                huff_code.code(15 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 15) := ac_code.code(10 downto 0)&huff_value.code(0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 14) := ac_code.code(10 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 13) := ac_code.code(10 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 12) := ac_code.code(10 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 11) := ac_code.code(10 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 10) := ac_code.code(10 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 9) := ac_code.code(10 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 8) := ac_code.code(10 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 7) := ac_code.code(10 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 6) := ac_code.code(10 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 5) := ac_code.code(10 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(4 downto 0) := (others => '0');
+        end case;
+    when 12 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 15) := ac_code.code(11 downto 0);
+                huff_code.code(14 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 14) := ac_code.code(11 downto 0)&huff_value.code(0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 13) := ac_code.code(11 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 12) := ac_code.code(11 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 11) := ac_code.code(11 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 10) := ac_code.code(11 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 9) := ac_code.code(11 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 8) := ac_code.code(11 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 7) := ac_code.code(11 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 6) := ac_code.code(11 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 5) := ac_code.code(11 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(4 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 4) := ac_code.code(11 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(3 downto 0) := (others => '0');
+        end case;
+    when 13 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 14) := ac_code.code(12 downto 0);
+                huff_code.code(13 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 13) := ac_code.code(12 downto 0)&huff_value.code(0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 12) := ac_code.code(12 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 11) := ac_code.code(12 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 10) := ac_code.code(12 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 9) := ac_code.code(12 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 8) := ac_code.code(12 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 7) := ac_code.code(12 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 6) := ac_code.code(12 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 5) := ac_code.code(12 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(4 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 4) := ac_code.code(12 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(3 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 3) := ac_code.code(12 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(2 downto 0) := (others => '0');
+        end case;
+    when 14 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 13) := ac_code.code(13 downto 0);
+                huff_code.code(12 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 12) := ac_code.code(13 downto 0)&huff_value.code(0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 11) := ac_code.code(13 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 10) := ac_code.code(13 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 9) := ac_code.code(13 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 8) := ac_code.code(13 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 7) := ac_code.code(13 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 6) := ac_code.code(13 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 5) := ac_code.code(13 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(4 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 4) := ac_code.code(13 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(3 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 3) := ac_code.code(13 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(2 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 2) := ac_code.code(13 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(1 downto 0) := (others => '0');
+        end case;
+    when 15 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 12) := ac_code.code(14 downto 0);
+                huff_code.code(11 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 11) := ac_code.code(14 downto 0)&huff_value.code(0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 10) := ac_code.code(14 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 9) := ac_code.code(14 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 8) := ac_code.code(14 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 7) := ac_code.code(14 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 6) := ac_code.code(14 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 5) := ac_code.code(14 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(4 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 4) := ac_code.code(14 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(3 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 3) := ac_code.code(14 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(2 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 2) := ac_code.code(14 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(1 downto 0) := (others => '0');
+            when 11 =>
+                huff_code.code(26 downto 1) := ac_code.code(14 downto 0)&huff_value.code(10 downto 0);
+                huff_code.code(0) := '0';
+        end case;
+    when 16 =>
+        case huff_value.code_length is 
+            when 0 =>
+                huff_code.code(26 downto 11) := ac_code.code(15 downto 0);
+                huff_code.code(10 downto 0) := (others => '0');
+            when 1 =>
+                huff_code.code(26 downto 10) := ac_code.code(15 downto 0)&huff_value.code(0);
+                huff_code.code(9 downto 0) := (others => '0');
+            when 2 =>
+                huff_code.code(26 downto 9) := ac_code.code(15 downto 0)&huff_value.code(1 downto 0);
+                huff_code.code(8 downto 0) := (others => '0');
+            when 3 =>
+                huff_code.code(26 downto 8) := ac_code.code(15 downto 0)&huff_value.code(2 downto 0);
+                huff_code.code(7 downto 0) := (others => '0');
+            when 4 =>
+                huff_code.code(26 downto 7) := ac_code.code(15 downto 0)&huff_value.code(3 downto 0);
+                huff_code.code(6 downto 0) := (others => '0');
+            when 5 =>
+                huff_code.code(26 downto 6) := ac_code.code(15 downto 0)&huff_value.code(4 downto 0);
+                huff_code.code(5 downto 0) := (others => '0');
+            when 6 =>
+                huff_code.code(26 downto 5) := ac_code.code(15 downto 0)&huff_value.code(5 downto 0);
+                huff_code.code(4 downto 0) := (others => '0');
+            when 7 =>
+                huff_code.code(26 downto 4) := ac_code.code(15 downto 0)&huff_value.code(6 downto 0);
+                huff_code.code(3 downto 0) := (others => '0');
+            when 8 =>
+                huff_code.code(26 downto 3) := ac_code.code(15 downto 0)&huff_value.code(7 downto 0);
+                huff_code.code(2 downto 0) := (others => '0');
+            when 9 =>
+                huff_code.code(26 downto 2) := ac_code.code(15 downto 0)&huff_value.code(8 downto 0);
+                huff_code.code(1 downto 0) := (others => '0');
+            when 10 =>
+                huff_code.code(26 downto 1) := ac_code.code(15 downto 0)&huff_value.code(9 downto 0);
+                huff_code.code(0) := '0';
+            when 11 =>
+                huff_code.code(26 downto 0) := ac_code.code(15 downto 0)&huff_value.code(10 downto 0);
+                
+        end case;
+    end case;
+    return huff_code;
+    end function;
+-------------------
+
+
+end jpeg_pkg;
+        
