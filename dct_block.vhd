@@ -18,9 +18,8 @@ use work.jpeg_pkg.all;
 
 entity dct_block is
   port (
-    clock,dct_start,dct_finished : in std_logic;
+    clock,dct_start : in std_logic;
     dct_working : out std_logic;
-    y_x_index : in unsigned(5 downto 0);
     img_pixel : in sfixed(7 downto 0);
     dct_coeff_block : out dct_coeff_block_t
     --v_in,u_in : in unsigned(2 downto 0);
@@ -33,9 +32,9 @@ end dct_block ;
 architecture arch of dct_block is
     signal end_delay_count: integer range 0 to 3:=0;
     signal clock_count : integer range 0 to 4;
-    
+    signal y_x_index : unsigned(5 downto 0);
     signal const_1,const_2,const_3 : sfixed(1 downto -16);
-    signal dct_working_s: std_logic := '0';
+    signal dct_working_s,dct_finished: std_logic := '0';
     signal y,x : integer range 0 to 7 := 0;
     signal img : image_block_t;
     --signal dct_coeff_block : dct_coeff_block_t;
@@ -49,7 +48,19 @@ begin
 -- ("01111111","01111111","01111111","01111110","01111101","01111101","01111101","01111110"),
 -- ("01111110","01111110","01111111","01111110","01111110","01111101","01111101","01111101"));
 -- img_pixel <= img(y)(x);
-
+y_x_index_pr : process(dct_working_s,clock)
+begin
+    if dct_working_s = '0' then 
+        y_x_index <= "000000";
+        dct_finished <= '0';
+    elsif falling_edge(clock) and dct_working_s = '1' then
+        if y_x_index = "111111" then 
+            dct_finished <= '1';
+        else
+            y_x_index <= y_x_index + 1;
+        end if;
+    end if;
+end process ; --y_x_index
 const_1 <="000010000000000000";  -- u,v = 0
 const_2 <="000010110101000001";  -- u or v = 0
 const_3 <="000100000000000000";  -- else

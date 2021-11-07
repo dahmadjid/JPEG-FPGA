@@ -1,25 +1,27 @@
 import numpy as np
 
-# test =[[(j,i) for i in range(8) ] for j in range(8)]
-# zigzag = np.array([
-#     [0, 1, 5, 6, 14, 15, 27, 28],
-# 	[2, 4, 7, 13, 16, 26, 29, 42],
-# 	[3, 8, 12, 17, 25, 30, 41, 43],
-# 	[9, 11, 18, 24, 31, 40, 44, 53],
-# 	[10, 19, 23, 32, 39, 45, 52, 54],
-# 	[20, 22, 33, 38, 46, 51, 55, 60],
-# 	[21, 34, 37, 47, 50, 56, 59, 61],
-# 	[35, 36, 48, 49, 57, 58, 62, 63]])
-# print(test)
-# zigzag = zigzag.reshape(64)
+test =[[(j,i) for i in range(8) ] for j in range(8)]
+zigzag = np.array([
+    [0, 1, 5, 6, 14, 15, 27, 28],
+	[2, 4, 7, 13, 16, 26, 29, 42],
+	[3, 8, 12, 17, 25, 30, 41, 43],
+	[9, 11, 18, 24, 31, 40, 44, 53],
+	[10, 19, 23, 32, 39, 45, 52, 54],
+	[20, 22, 33, 38, 46, 51, 55, 60],
+	[21, 34, 37, 47, 50, 56, 59, 61],
+	[35, 36, 48, 49, 57, 58, 62, 63]])
+print(test)
+zigzag = zigzag.reshape(64)
 
-# print(zigzag)
-# new = [0 for i in range(64)]
-# i = 0
-# test = np.array(test).reshape(64,2).tolist()
-# for index in zigzag:
-#     new[index] = test[i]
-#     i += 1
+print(zigzag)
+new2 = [i for i in range(64)]
+new = [0 for i in range(64)]
+i = 0
+test = np.array(test).reshape(64,2).tolist()
+for index in zigzag:
+    new[index] = new2[i]
+    i += 1
+print(new)
 
 # text = "dct_coeff_zz <= ("
 # for j,i in new:
@@ -488,3 +490,5 @@ for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['CHROMINANCE'].items():
 text = text[:-3] + ');\n\n'
 with open("huff_table.txt" ,'w') as f:
     f.write(text)
+
+

@@ -3,13 +3,14 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 library ieee_proposed;
 use ieee_proposed.fixed_pkg.all;
+use work.jpeg_pkg.all;
 --Tested on FPGA
 entity mini_length is
     port 
     (
         dct_coeff : in sfixed(10 downto 0);  
-        huff_value : out sfixed(10 downto 0);
-        length : out unsigned(3 downto 0) --number between 0 and 11
+        huff_value : out huff_value_t
+        
     ) ;
 end mini_length;
 
@@ -34,7 +35,7 @@ begin
         "0011" when temp(2) = '1' else
         "0010" when temp(1) = '1' else
         "0001" when temp(0) = '1' else
-        "0000" when temp(0) = '0';
+        "0000";
    
 process(dct_coeff,temp2,length_temp)
 begin
@@ -76,8 +77,8 @@ begin
         huff_value_temp <= "00000000000";      
     end if;
 end process;
-huff_value <= huff_value_temp;
-length <= length_temp;
+huff_value <= (std_logic_vector(huff_value_temp),to_integer(length_temp));
+
 end arch;
 
 

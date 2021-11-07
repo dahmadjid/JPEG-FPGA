@@ -7,17 +7,16 @@ use ieee_proposed.fixed_pkg.all;
 use work.jpeg_pkg.all;
 
 
-
--- convert dct_coeff_zz into a matrix of records and overload + , return the entire code, do the ac process.
 entity jpeg is
-generic (width : natural := 256;
-height : natural := 192   );
+generic (
+    width : natural := 256;
+    height : natural := 192);
 port(clock,start : in std_logic;
     data_in: in std_logic_vector(7 downto 0);
     clock_delay_n : in std_logic;
-    hex_1,hex_2,hex_3,hex_4,hex_5 : out std_logic_vector(6 downto 0);
+    hex_0,hex_1,hex_2,hex_3,hex_4,hex_5 : out std_logic_vector(6 downto 0);
     data_out: out std_logic_vector(7 downto 0));
-end jpeg;   
+end jpeg; 
 
 architecture arch of jpeg is
     type state_t is (idle,converting,dct,encoding);
@@ -29,33 +28,43 @@ architecture arch of jpeg is
     signal rw_counter : integer range 0 to 11:= 0; 
     --read write counter for 0-11 read : r,g,b and then 6-11 :write y,cb,cr even are for addressing and odd for reading q. dct_clock cant be 50mhz. slow but it works idc at this point.
     
-    signal clock_count: integer range 0 to 1 := 0;
+    signal clock_count,clock_count_2: integer range 0 to 50 := 0;
     signal present_state : state_t;
     signal next_state : state_t;
     signal image_index_count,index_count : integer range 0 to 49151:= 0;
     shared variable r,g,b : unsigned(7 downto 0):= "00000000";
-    signal y,cb,cr,y_reg,cb_reg,cr_reg : sfixed(7 downto 0);
+    signal y,cb,cr,y_reg,cb_reg,cr_reg ,encoding_data_out: sfixed(7 downto 0);
     signal wren,wren_rgb_ycbcr,wren_dct,image_converted,image_index_clock,clock_delay,wren_encoding,encoding_done: std_logic := '0';
     signal data,q,converting_data_out : std_logic_vector(7 downto 0);
-    signal jpeg_start,dct_working: std_logic := '0';
+    signal jpeg_start,dct_working,code_ready: std_logic := '0';
     shared variable img_pixel : sfixed(7 downto 0);
     signal v_in,u_in : unsigned(2 downto 0);
     signal hex_out,dct_coeff_block,dct_coeff_block_qz : dct_coeff_block_t;
     signal dct_read_counter : integer range 0 to 1 := 0;
-    signal dct_clock,dct_finished :std_logic := '0';
+    signal dct_clock,clock_delay_2 :std_logic := '0';
     signal block_index_count : integer range 0 to 1024 := 0;
     signal dct_start : std_logic:= '1'; 
-    signal y_x_index : unsigned(5 downto 0);
-    signal dct_coeff_zz : dct_coeff_zz_t;
-    signal huff_value_zz : dct_coeff_zz_t; 
+    signal hex_5_data,hex_4_data,hex_3_data,hex_2_data,hex_1_data,hex_0_data : std_logic_vector(3 downto 0);
+    signal dct_coeff_zz,dct_coeff_zz_temp : dct_coeff_zz_t;
+    signal huff_value_zz : huff_value_zz_t; 
     signal length_zz : length_zz_t;
     signal old_dc_reg : sfixed(10 downto 0) := "00000000000";
     signal y_dc_code : y_dc_code_t ;
     signal y_ac_code : ac_code_t ;
-    signal huff_value : huff_value_t;
+    signal huff_value,ac_huff_value : huff_value_t;
     signal huff_code : huff_code_t;
+    signal l : std_logic := '0';
+    signal huff_code_table : huff_code_table_t;
+    
+    signal zrl_flag : std_logic_vector(2 downto 0) := "000";
+    signal ac_huff_code,ac_huff_code_2 : huff_code_t;
+    signal run_length,table_index : integer range 0 to 63 := 0;
+    signal huff_code_index : integer range 0 to 63 := 1;
+    signal extra_reg,temp_reg : std_logic_vector(63 downto 0) := (others => '0');
+    signal extra : std_logic := '0';
+    signal extra_length : integer range 0 to 63 := 0;
 begin
--- clock_delay <= not clock_delay_n;
+jpeg_start <= '1';
 --jpeg_start_pr : process( start )
 -- begin
 --     if image_converted = '1' then 
@@ -64,15 +73,18 @@ begin
 --         jpeg_start <= '1';
 --     end if;
 -- end process ; -- jpeg_start_pr
-jpeg_start <= '1';
+
 delayed_clock : process(clock)
 begin
 if rising_edge(clock) then
-    if clock_count = 1  then     --1/4 of clock is necessary, i tried 1/2 and its corrupted data
+    if present_state = idle then
+        clock_delay <= '0';
+        clock_count <= 0;
+    elsif clock_count = 1 then     --1/4 of clock is necessary, i tried 1/2 and its corrupted data when writing to bram
         clock_delay <= not clock_delay;
         clock_count <= 0;
     else
-        clock_count <= 1;
+        clock_count <= clock_count + 1;
     end if;
 end if;
 end process ; -- dct_clock
@@ -101,7 +113,8 @@ image_index_count_clock_pr : process(clock_delay,present_state)
         end if;
     end if;
 end process;
-image_index_count_pr : process(image_index_clock) 
+
+image_index_count_pr : process(image_index_clock,present_state) 
     begin
     if present_state /= converting then
         image_index_count <= 0;
@@ -113,7 +126,8 @@ image_index_count_pr : process(image_index_clock)
         end if;
     end if;
 end process;
-rgb_ycbcr_pr :process(clock_delay)
+
+rgb_ycbcr_pr :process(clock_delay,present_state)
     begin
     if rising_edge(clock_delay) and present_state = converting then
         case rw_counter is
@@ -156,7 +170,8 @@ rgb_ycbcr_pr :process(clock_delay)
         end case;
     end if;
 end process;
-rgb_ycbcr_conversion_pr :process(clock)   
+
+rgb_ycbcr_conversion_pr :process(clock,present_state)   
     variable rs,gs,bs,y_temp,cb_temp,cr_temp: unsigned(23 downto 0);
     variable y_temp2,cb_temp2,cr_temp2 : unsigned(7 downto 0);
     begin
@@ -183,39 +198,21 @@ end process;
 -------------------------------------------------------------------------------------------
 
 --------------------------------------- DCT STATE -----------------------------------------
-dct_comp : dct_block port map(dct_clock,dct_start,dct_finished,dct_working,y_x_index,img_pixel,dct_coeff_block);
-y_quant_comp : y_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
--- cb_quant_comp : cb_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
--- cr_quant_comp : cr_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
+
 bid_comp : block_index_decoder port map(to_unsigned(index_count,6),0,0,width,height,0,address_bid);
-zigzag_comp : zigzag port map(dct_coeff_block,dct_coeff_zz);
 process(clock)
 begin
     address_dct := std_logic_vector(to_unsigned(address_bid,18));
 end process;
-y_x_index_pr : process(dct_working,dct_clock)
-begin
-    if dct_working = '0' then 
-        y_x_index <= "000000";
-        dct_finished <= '0';
-    elsif falling_edge(dct_clock) and dct_working = '1' then
-        if y_x_index = "111111" then 
-            dct_finished <= '1';
-        else
-            y_x_index <= y_x_index + 1;
-        end if;
-    end if;
-end process ; --y_x_index
-
 pixel_pr : process(clock_delay,present_state)
 begin
-    if present_state /= dct then
-        dct_read_counter <= 0;
-        
-        dct_clock <= '0';
-        index_count <= 0;
-    elsif rising_edge(clock_delay) then
-        if dct_working = '1' then
+    
+    if rising_edge(clock_delay) then
+        if present_state /= dct then
+            dct_read_counter <= 0;
+            dct_clock <= '0';
+            index_count <= 0;
+        elsif dct_working = '1' then
             case dct_read_counter is
                 when 0 =>
                     wren_dct <= '0';
@@ -229,11 +226,19 @@ begin
             end case;
         end if;     
     end if; 
-end process ; -- pixel_process
+end process ; -- pixel_pr
+
+dct_comp : dct_block port map(dct_clock,dct_start,dct_working,img_pixel,dct_coeff_block);
+y_quant_comp : y_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
+-- cb_quant_comp : cb_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
+-- cr_quant_comp : cr_quantizer port map(dct_coeff_block,dct_coeff_block_qz);
+zigzag_comp : zigzag port map(dct_coeff_block_qz,dct_coeff_zz);
+
 -------------------------------------------------------------------------------------------
 
 -------------------------------------ENCODING STATE----------------------------------------
-mini_length_comp : mini_length_block port map(dct_coeff_zz(0) - old_dc_reg,dct_coeff_zz,huff_value_zz,length_zz);
+-- dct_coeff_zz <= ("00000011101", "00000000000", "00000000000", "00000000000", "00000010000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000000", "00000000001", "00000000000", "00000000000");
+mini_length_comp : mini_length_block port map(dct_coeff_zz(0) - "00000000000",dct_coeff_zz,huff_value_zz);
 old_dc_reg_pr : process( encoding_done,present_state )
 begin  
     if present_state = idle then
@@ -243,14 +248,179 @@ begin
     end if;
 end process ; -- old_dc_reg_pr
 
-y_dc_code <= y_dc_codes(to_integer(length_zz(to_integer(v&u))));
-huff_value<= (std_logic_vector(huff_value_zz(to_integer(v&u))),to_integer(length_zz(to_integer(v&u))));
+delayed_clock_pr : process(clock)
+begin
+if present_state /= encoding then
+    clock_count_2 <= 0;
+    clock_delay_2 <= '0';
+elsif rising_edge(clock) then
+    if clock_count_2 = 1 then     --1/4 of clock is necessary, i tried 1/2 and its corrupted data
+        clock_delay_2 <= not clock_delay_2;
+        clock_count_2 <= 0;
+    else
+        clock_count_2 <= clock_count_2 + 1;
+        
+    end if;
+end if;
+end process ; -- dct_clock  
+
+huff_code_index_pr : process(clock_delay_2,present_state)
+    variable huff_clock_count : integer range 0 to 1:= 0;
+begin
+    if present_state /= encoding then
+        huff_code_index <= 1;  
+    elsif falling_edge(clock_delay_2) then
+        if huff_code_index = 63 then
+            encoding_done <= '1';
+        else
+            huff_code_index <= huff_code_index + 1;
+            encoding_done <= '0';
+        end if;
+    end if; 
+end process ; 
+
+y_dc_code <= y_dc_codes(huff_value_zz(0).code_length);
+huff_value<= huff_value_zz(0);
 huff_code <= y_dc_code + huff_value;
 
+
+ac_huff_value <= huff_value_zz(huff_code_index);
+ac_encoding : process(clock_delay_2,present_state,encoding_done)
+begin
+    if present_state /= encoding or encoding_done = '1' then
+        run_length <= 0;
+        code_ready <= '0';
+        zrl_flag <= "000";
+        table_index <= 1;
+    elsif rising_edge(clock_delay_2) and code_ready = '0' then
+        
+        if ac_huff_value.code_length = 0 and huff_code_index = 63 then
+            ac_huff_code <= y_eob; 
+            code_ready <= '1';
+        elsif ac_huff_value.code_length = 0 then
+            run_length <= run_length + 1;
+            code_ready <= '0';
+        elsif run_length > 59 then
+            zrl_flag <= "100";
+            ac_huff_code <= y_ac_codes(run_length - 60)(ac_huff_value.code_length) + ac_huff_value;
+            run_length <= 0;
+            code_ready <= '1';
+            table_index <= table_index + 4;
+        elsif run_length > 44 then
+            zrl_flag <= "011";
+            ac_huff_code <= y_ac_codes(run_length - 45)(ac_huff_value.code_length) + ac_huff_value;
+            run_length <= 0;
+            code_ready <= '1';
+            table_index <= table_index + 3;
+        elsif run_length > 29 then
+            zrl_flag <= "010";
+            ac_huff_code <= y_ac_codes(run_length - 30)(ac_huff_value.code_length) + ac_huff_value;
+            run_length <= 0;
+            code_ready <= '1';
+            table_index <= table_index + 2;
+        elsif run_length > 14 then
+            zrl_flag <= "001";
+            ac_huff_code <= y_ac_codes(run_length - 15)(ac_huff_value.code_length) + ac_huff_value;
+            run_length <= 0;
+            code_ready <= '1';
+            table_index <= table_index + 1;
+        else 
+            zrl_flag <= "000";
+            ac_huff_code <= y_ac_codes(run_length)(ac_huff_value.code_length) + ac_huff_value;
+            run_length <= 0;
+            code_ready <= '1';
+            table_index <= table_index ;
+        end if;
+    end if; 
+end process ; -- ac_encoding
+
+ 
+
+ac_encoding_2 : process(clock_delay_2,present_state,code_ready)
+begin
+    
+    if falling_edge(clock_delay_2) and present_state = encoding and code_ready = '1' then
+        huff_code_table(0) <= huff_code;
+        if zrl_flag = "000" then
+                huff_code_table(table_index) <= ac_huff_code;
+        elsif zrl_flag = "001" then
+                huff_code_table(table_index-1) <= y_zrl;
+                huff_code_table(table_index) <= ac_huff_code;
+        elsif zrl_flag = "010" then
+                huff_code_table(table_index-2) <= y_zrl;
+                huff_code_table(table_index-1) <= y_zrl;
+                huff_code_table(table_index) <= ac_huff_code; 
+        elsif zrl_flag = "011" then
+                huff_code_table(table_index-3) <= y_zrl;
+                huff_code_table(table_index-2) <= y_zrl;
+                huff_code_table(table_index-1) <= y_zrl;
+                huff_code_table(table_index) <= ac_huff_code;
+        elsif zrl_flag = "100" then
+                huff_code_table(table_index-4) <= y_zrl;
+                huff_code_table(table_index-3) <= y_zrl;
+                huff_code_table(table_index-2) <= y_zrl;
+                huff_code_table(table_index-1) <= y_zrl;
+                huff_code_table(table_index) <= ac_huff_code;
+        end if;
+    end if;
+end process ; -- ac_encoding_2
+
+
+
+
+
+
+-- writing_encoding_bram_pr : process( clock )
+-- variable encoding_count : integer range 0 to 1 := 0;
+-- begin
+--     if rising_edge(clock_delay_2) and code_ready = '1' then
+--         if extra = '0' then
+--                 if ac_huff_code.code_length >= 8 then
+--                     data_encoding := ac_huff_code.code(26 downto 19); -- to fifo
+--                     extra_reg(63 downto 45) <= ac_huff_code.code(18 downto 0);
+--                     extra_reg(44 downto 0) <= (others => '0');
+--                     extra_length <= ac_huff_code.code_length - 8;
+--                 else 
+--                     extra_reg(63 downto 37) <= ac_huff_code.code(26 downto 0);
+--                     extra_reg(27 downto 0) <= (others => '0');
+--                     extra_length <= ac_huff_code.code_length;
+--                 end if;
+--         elsif extra = '1' then
+--             if extra_length >= 8 then
+--                 case encoding_count is
+--                     when 0 =>
+--                         data_encoding := extra_reg(63 downto 56); -- to fifo
+--                         extra_reg <= shiftl(extra_reg,8); 
+--                         extra_length <= extra_length - 8;
+--                         temp_reg(63 downto 37) <= ac_huff_code.code;
+--                         temp_reg(36 downto 0) <= (others => '0');
+--                     when 1 =>
+--                         extra_reg <= extra_reg or shiftr(temp_reg ,extra_length);
+--                         extra_length <= extra_length + ac_huff_code.code_length;
+--                 end case;
+--             else
+--                 extra_reg(63 downto 28) <= extra_reg(63 downto 28) or shiftr(ac_huff_code.code(26 downto 0)&x"00" , extra_length); -- 27 bit + 8 max
+--                 extra_reg(27 downto 0) <= (others => '0');
+--                 extra_length <= extra_length + ac_huff_code.code_length;
+--             end if;
+--         end if ;
+--     end if;
+
+-- end process ; -- writing_encoding_bram_pr
+
+
+
+
+
+
+
+
+
+
 -------------------------------------------------------------------------------------------
-present_state_pr : process(clock_delay)
+present_state_pr : process(clock)
     begin
-        if rising_edge(clock_delay) then
+        if rising_edge(clock) then
             if jpeg_start = '1' then
                 present_state <= next_state;
             else 
@@ -260,7 +430,7 @@ present_state_pr : process(clock_delay)
     end process;
 
 
-next_state_pr : process(present_state,image_converted)
+next_state_pr : process(present_state,image_converted,dct_working,encoding_done)
     begin 
         case present_state is
             when idle => 
@@ -283,7 +453,7 @@ next_state_pr : process(present_state,image_converted)
                 end if;
             when encoding =>
                 if encoding_done = '1' then
-                    next_state <= dct;
+                    next_state <= idle;
                 else
                     next_state <= encoding;
                 end if;
@@ -291,6 +461,7 @@ next_state_pr : process(present_state,image_converted)
 end process;
 v <= unsigned(data_in(5 downto 3));
 u <= unsigned(data_in(2 downto 0));
+-- encoding_data_out <= "11000000" srl to_integer(unsigned(data_in(7 downto 5)));
 outputs_fsm_pr : process(present_state)
 begin
     case present_state is 
@@ -304,14 +475,17 @@ begin
             end if;
             data <= (others => '0');
             wren <= '0';
-            data_out <= y_dc_code.code(8)&std_logic_vector(to_unsigned(y_dc_code.code_length,7));
+            
+            data_out <= huff_code_table(to_integer(v&u)).code(2 downto 0)&"00000";
             dct_start <= '1';
+            img_pixel := "00000000";
         when converting =>
             address <= address_rgb_ycbcr;
             data <= data_rgb_ycbcr;
             wren <= wren_rgb_ycbcr;
             data_out <= converting_data_out;
             dct_start <= '1';
+            img_pixel := "00000000";
         when dct => 
             address <= address_dct;
             data <= data_dct;
@@ -322,13 +496,22 @@ begin
         when encoding =>
             address <= address_encoding;
             data <= data_encoding;
-            wren <= wren_encoding;
-            dct_start <= '0';
+            wren <= '0';
+            dct_start <= '1';
+            data_out <= huff_code_table(to_integer(v&u)).code(6 downto 0)&'0';
+            img_pixel := "00000000";
     end case;
 end process;
+
 hex_out <= dct_coeff_block when data_in(7 downto 6) = "00" else dct_coeff_block_qz;
+hex_5_data <= huff_code_table(to_integer(v&u)).code(26 downto 23) when data_in(7 downto 6) = "10" else "0000"  when data_in(7 downto 6) = "11" else q(7 downto 4);
+hex_4_data <= huff_code_table(to_integer(v&u)).code(22 downto 19) when data_in(7 downto 6) = "10" else std_logic_vector(to_unsigned(huff_value_zz(to_integer(v&u)).code_length,4)) when data_in(7 downto 6) = "11" else q(3 downto 0);
+hex_3_data <= huff_code_table(to_integer(v&u)).code(18 downto 15) when data_in(7 downto 6) = "10" else '0'&huff_value_zz(to_integer(v&u)).code(10 downto 8) when data_in(7 downto 6) = "11" else "0000";
+hex_2_data <= huff_code_table(to_integer(v&u)).code(14 downto 11) when data_in(7 downto 6) = "10" else huff_value_zz(to_integer(v&u)).code(7 downto 4) when data_in(7 downto 6) = "11" else std_logic_vector('0'&hex_out(to_integer(v))(to_integer(u))(10 downto 8));
+hex_1_data <= huff_code_table(to_integer(v&u)).code(10 downto 7) when data_in(7 downto 6) = "10" else huff_value_zz(to_integer(v&u)).code(3 downto 0) when data_in(7 downto 6) = "11" else std_logic_vector(hex_out(to_integer(v))(to_integer(u))(7 downto 4));
+hex_0_data <= huff_code_table(to_integer(v&u)).code(6 downto 3) when data_in(7 downto 6) = "10" else std_logic_vector(hex_out(to_integer(v))(to_integer(u))(3 downto 0));
 --with hex_out(to_integer(v))(to_integer(u))(3 downto 0) select hex_1 <=
-with huff_code.code(26 downto 23) select hex_1 <=
+with hex_5_data select hex_5 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -347,7 +530,7 @@ with huff_code.code(26 downto 23) select hex_1 <=
     "0001110" when "1111",
     "1111111" when others;	
 --with hex_out(to_integer(v))(to_integer(u))(7 downto 4) select hex_2 <=
-with huff_code.code(22 downto 19) select hex_2 <=
+with hex_4_data select hex_4 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -366,7 +549,7 @@ with huff_code.code(22 downto 19) select hex_2 <=
     "0001110" when "1111",
     "1111111" when others;
 --with hex_out(to_integer(v))(to_integer(u))(10 downto 8) select hex_3 <=
-with huff_code.code( 18 downto 15) select hex_3 <=
+with hex_3_data select hex_3 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -386,7 +569,7 @@ with huff_code.code( 18 downto 15) select hex_3 <=
     "1111111" when others;
 
 --with q(3 downto 0) select hex_4 <= 
-with huff_code.code(14 downto 11) select hex_4 <=
+with hex_2_data select hex_2 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 
@@ -406,7 +589,25 @@ with huff_code.code(14 downto 11) select hex_4 <=
     "1111111" when others;	
 
 --with q(7 downto 4) select hex_5 <= 
-with huff_code.code(10 downto 7) select hex_5 <=
+with hex_1_data select hex_1 <=
+    "1000000" when "0000",	
+    "1111001" when "0001",	
+    "0100100" when "0010", 	 
+    "0110000" when "0011", 	
+    "0011001" when "0100", 	
+    "0010010" when "0101", 	
+    "0000010" when "0110", 	
+    "1111000" when "0111", 	
+    "0000000" when "1000", 	
+    "0011000" when "1001", 
+    "0001000" when "1010",    
+    "0000011" when "1011",    
+    "1000110" when "1100",    
+    "0100001" when "1101",
+    "0000110" when "1110",
+    "0001110" when "1111",
+    "1111111" when others;	
+with hex_0_data select hex_0 <=
     "1000000" when "0000",	
     "1111001" when "0001",	
     "0100100" when "0010", 	 

@@ -7,3 +7,4 @@ for i in range(signal_size+1):
 
 with open("mini_length.txt" ,"w") as f:
     f.write(text)
+print('0'*16)

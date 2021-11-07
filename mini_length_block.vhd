@@ -6,10 +6,10 @@ use ieee_proposed.fixed_pkg.all;
 use work.jpeg_pkg.all;
 entity mini_length_block is
   port (
+      clock :in std_logic;
     dc_diff : in sfixed(11 downto 0);
     dct_coeff_zz : in dct_coeff_zz_t;
-    huff_value_zz : out dct_coeff_zz_t;
-    length_zz : out length_zz_t
+    huff_value_zz : out huff_value_zz_t
   ) ;
 end mini_length_block;
 
@@ -24,7 +24,7 @@ begin
     temp <= resize(not dc_diff + 1,11,0) when '1', dc_diff when others;
 temp2 <= not temp when dc_diff(11) = '1' else temp;
 length_temp <= 
-    "1100" when temp(11) = '1' else
+    "1011" when temp(11) = '1' else
     "1011" when temp(10) = '1' else
     "1010" when temp(9) = '1' else
     "1001" when temp(8) = '1' else
@@ -36,11 +36,13 @@ length_temp <=
     "0011" when temp(2) = '1' else
     "0010" when temp(1) = '1' else
     "0001" when temp(0) = '1' else
-    "0000" when temp(0) = '0';
+    "0000";
 
 process(dc_diff,temp2,length_temp)
 begin
-if length_temp = "0000" then
+if dc_diff = "100000000000" then
+    huff_value_temp <= "00000000000";
+elsif length_temp = "0000" then
     huff_value_temp <= "00000000000";
 elsif length_temp = "0001" then
     huff_value_temp(0) <= temp2(0);
@@ -78,13 +80,16 @@ else
     huff_value_temp <= "00000000000";      
 end if;
 end process;
-huff_value_zz(0) <= huff_value_temp;
-length_zz(0) <= length_temp;
+
+
+huff_value_zz(0) <= (std_logic_vector(huff_value_temp),to_integer(length_temp));
+
 
 
 
 mini_length_gen :for i in 1 to 63 generate  --AC
-    mini_length_comp : mini_length port map(dct_coeff_zz(i),huff_value_zz(i),length_zz(i));
+    mini_length_comp : mini_length port map(dct_coeff_zz(i),huff_value_zz(i));
 end generate;
+
 
 end arch ; -- arch

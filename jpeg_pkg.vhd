@@ -43,7 +43,7 @@ package jpeg_pkg is
         code_length : integer range 1 to 16;
     end record;
 
-    type additional_bits_table_t is array(0 to 63) of huff_value_t; --
+    type huff_value_zz_t is array(0 to 63) of huff_value_t; --
 
     type y_dc_code_table_t is array(0 to 11) of y_dc_code_t;
     type c_dc_code_table_t is array(0 to 11) of c_dc_code_t;
@@ -55,9 +55,8 @@ package jpeg_pkg is
         code : std_logic_vector(26 downto 0);
         code_length : integer range 1 to 27;
     end record;
-
+    type huff_code_table_t is array(0 to 63) of huff_code_t;
     
-
     constant luminance_qz: image_block_t := (
     ("00010000","00001011","00001010","00010000","00011000","00101000","00110011","00111101"),
     ("00001100","00001100","00001110","00010011","00011010","00111010","00111100","00110111"),
@@ -137,10 +136,18 @@ package jpeg_pkg is
     (("0011111111100000",14),("1111111111101101",16),("1111111111101110",16),("1111111111101111",16),("1111111111110000",16),("1111111111110001",16),("1111111111110010",16),("1111111111110011",16),("1111111111110100",16),("1111111111110101",16)),
     (("0111111111000011",15),("1111111111110110",16),("1111111111110111",16),("1111111111111000",16),("1111111111111001",16),("1111111111111010",16),("1111111111111011",16),("1111111111111100",16),("1111111111111101",16),("1111111111111110",16)));
     
+    constant y_zrl : huff_code_t := ("111111110010000000000000000",11);
+    constant y_eob : huff_code_t := ("101000000000000000000000000",4);
+
+    constant c_zrl : huff_code_t := ("000000000000000000000000000",2);
+    constant c_eob : huff_code_t := ("111111101000000000000000000",10);
+
     function "+"( y_dc_code : y_dc_code_t; huff_value : huff_value_t) return huff_code_t;
     function "+" ( c_dc_code : c_dc_code_t; huff_value : huff_value_t) return huff_code_t;
     function "+" ( ac_code : ac_code_t;  huff_value : huff_value_t) return huff_code_t;
-    function concat(a,b: std_logic_vector ;length_a:integer range 0 to 11;length_b:integer range 1 to 16) return huff_code_t;
+    function shiftl (arg : std_logic_vector;count : integer) return std_logic_vector;
+    function shiftr (arg : std_logic_vector;count : integer) return std_logic_vector;
+    
     component cos is   
         port 
         (
@@ -169,9 +176,8 @@ package jpeg_pkg is
 
     component dct_block is
         port (
-        clock,dct_start,dct_finished : in std_logic;
+        clock,dct_start : in std_logic;
         dct_working : out std_logic;
-        y_x_index : in unsigned(5 downto 0);
         img_pixel : in sfixed(7 downto 0);
         dct_coeff_block : out dct_coeff_block_t
             -- v_in,u_in : in unsigned(2 downto 0);
@@ -183,16 +189,14 @@ package jpeg_pkg is
         port 
         (
             dct_coeff : in sfixed(10 downto 0);  
-            huff_value : out sfixed(10 downto 0);
-            length : out unsigned(3 downto 0) --number between 0 and 11
+            huff_value : out huff_value_t
         ) ;
     end component;
     component mini_length_block is
         port (
             dc_diff : in sfixed(11 downto 0);
             dct_coeff_zz : in dct_coeff_zz_t;
-            huff_value_zz : out dct_coeff_zz_t;
-            length_zz : out length_zz_t
+            huff_value_zz : out huff_value_zz_t
         ) ;
       end component;
     component y_quantizer is
@@ -244,17 +248,49 @@ package jpeg_pkg is
           dct_coeff_zz : out dct_coeff_zz_t
         ) ;
     end component;
+    component spi_master is
+        port (
+          clock :in std_logic;
+          clr : in std_logic;
+      
+          data_tx : in std_logic_vector(7 downto 0);  -- data to be sent
+          data_tx_rdy : in std_logic; -- data ready to be written from data_tx register and starts the transimision in the next clock cycle
+      
+          --data_reg : out std_logic_vector(7 downto 0);
+      
+          data_rx : out std_logic_vector(7 downto 0);  -- data recieved from slave
+          data_rx_rdy : out std_logic; -- data ready to be read from data_rx register
+          
+          vcc: out std_logic;
+          gnd: out std_logic;
+          sck : out std_logic;
+          mosi :out std_logic;
+          miso :in std_logic;
+          cs :out std_logic
+      
+        ) ;
+      end component;
 end package;
 
 package body jpeg_pkg is 
-
-function concat(a,b: std_logic_vector ;length_a:integer range 0 to 11;length_b:integer range 1 to 16) return huff_code_t is
-    variable huff_code : huff_code_t;
-    begin
-        huff_code.code_length := length_a+length_b;
-        huff_code.code(26 downto 26 - length_a-length_b) := a(length_a - 1 downto 0) &b(length_b - 1 downto 0);
-        return huff_code;
-    end function;
+function shiftl (arg : std_logic_vector;count : integer) return std_logic_vector is
+    variable fixed,fixed_shifted : ufixed(arg'length - 1 downto 0);
+    variable ret : std_logic_vector(arg'length - 1 downto 0);
+begin 
+    fixed := to_ufixed(arg,arg'length-1,0);
+    fixed_shifted := fixed sll count;
+    ret := std_logic_vector(fixed_shifted);
+    return ret;
+end function; 
+function shiftr (arg : std_logic_vector;count : integer) return std_logic_vector is
+    variable fixed,fixed_shifted : ufixed(arg'length - 1 downto 0);
+    variable ret : std_logic_vector(arg'length - 1 downto 0);
+begin 
+    fixed := to_ufixed(arg,arg'length-1,0);
+    fixed_shifted := fixed srl count;
+    ret := std_logic_vector(fixed_shifted);
+    return ret;
+end function; 
      
 function "+" (y_dc_code : y_dc_code_t;huff_value : huff_value_t) return huff_code_t is
         variable huff_code : huff_code_t;
@@ -1695,7 +1731,6 @@ function "+" (ac_code : ac_code_t;huff_value : huff_value_t) return huff_code_t 
     return huff_code;
     end function;
 -------------------
-
 
 end jpeg_pkg;
         

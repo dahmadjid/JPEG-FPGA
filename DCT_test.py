@@ -102,4 +102,71 @@ for v in range(8):
                 #     print(dct_coeff[0,0],bin(int(dct_coeff[0,0]))[2:].zfill(11))
         dct_coeff[v,u] = int(dct_coeff[v,u])
 
+
 print(dct_coeff)
+def add_binary_nums(x, y):
+    max_len = max(len(x), len(y))
+
+    x = x.zfill(max_len)
+    y = y.zfill(max_len)
+        
+    # initialize the result
+    result = ''
+        
+    # initialize the carry
+    carry = 0
+
+    # Traverse the string
+    for i in range(max_len - 1, -1, -1):
+        r = carry
+        r += 1 if x[i] == '1' else 0
+        r += 1 if y[i] == '1' else 0
+        result = ('1' if r % 2 == 1 else '0') + result
+        carry = 0 if r < 2 else 1     # Compute the carry.
+        
+    if carry !=0 : result = '1' + result
+
+    return result.zfill(max_len)
+def twosComp(bin_str):
+    new = ''
+    for i in range(len(bin_str)):
+        if bin_str[i] == '0':
+            new+= '1'
+        else:
+            new+= '0'
+    new = add_binary_nums(new,'1')
+    return new
+zigzag = np.array([
+    [0, 1, 5, 6, 14, 15, 27, 28],
+	[2, 4, 7, 13, 16, 26, 29, 42],
+	[3, 8, 12, 17, 25, 30, 41, 43],
+	[9, 11, 18, 24, 31, 40, 44, 53],
+	[10, 19, 23, 32, 39, 45, 52, 54],
+	[20, 22, 33, 38, 46, 51, 55, 60],
+	[21, 34, 37, 47, 50, 56, 59, 61],
+	[35, 36, 48, 49, 57, 58, 62, 63]])
+zigzag = zigzag.reshape(64)
+new2 = [i for i in range(64)]
+new = [0 for i in range(64)]
+i = 0
+dct_coeff = dct_coeff.reshape(64)
+for index in zigzag:
+    new[index] = dct_coeff[i]
+    i += 1
+lumi_table = [16,11,10,	16,	24,	40,	51,	61,12,	12,	14,	19,	26,	58,	60,	55,14,	13,	16,	24,	40,	57,	69,	56,14,	17,	22,	29,	51,	87,	80,	62,18,	22,	37,	56,	68,	109,103,77,24,	35,	55,	64,	81,	104,113,92,49,	64,	78,	87,	103,121,120,101,72,	92,	95,	98,	112,100,103,99]
+
+chromi_table = [17,	18,	24,	47,	99,	99,	99,	99, 18,	21,	26,	66,	99,	99,	99,	99, 24,	26,	56,	99,	99,	99,	99,	99, 47,	66,	99,	99,	99, 99,	99,	99, 99,	99	,99,99,	99,	99,	99,	99, 99,	99,	99,	99	,99	,99	,99,99 ,99	,99	,99,	99,	99,	99,	99,	99, 99,	99,	99,	99,	99,	99,	99,	99]
+
+for i in range(64):
+    new[i] = new[i] /lumi_table[i]
+
+text = "dct_coeff_block_zz <= (" 
+for coeff in new:
+    coeff = int(coeff)
+    if coeff >= 0:
+        text += '"'+bin(int(coeff)).replace("0b","").zfill(11) + '", '
+    else:
+        text += '"'+twosComp(bin(int(coeff)).replace("-0b","").zfill(11)) + '", '
+
+with open("dct_coeff_zz","w") as f:
+    f.write(text)
