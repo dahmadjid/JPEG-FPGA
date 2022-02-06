@@ -136,7 +136,7 @@ package jpeg_pkg is
     (("0011111111100000",14),("1111111111101101",16),("1111111111101110",16),("1111111111101111",16),("1111111111110000",16),("1111111111110001",16),("1111111111110010",16),("1111111111110011",16),("1111111111110100",16),("1111111111110101",16)),
     (("0111111111000011",15),("1111111111110110",16),("1111111111110111",16),("1111111111111000",16),("1111111111111001",16),("1111111111111010",16),("1111111111111011",16),("1111111111111100",16),("1111111111111101",16),("1111111111111110",16)));
     
-    constant y_zrl : huff_code_t := ("111111110010000000000000000",11);
+    constant y_zrl : std_logic_vector(10 downto 0) := "11111111001";
     constant y_eob : huff_code_t := ("101000000000000000000000000",4);
 
     constant c_zrl : huff_code_t := ("000000000000000000000000000",2);
@@ -248,26 +248,68 @@ package jpeg_pkg is
           dct_coeff_zz : out dct_coeff_zz_t
         ) ;
     end component;
+
     component spi_master is
+        generic (
+            transaction_length : natural := 8 * 8);
         port (
-          clock :in std_logic;
+            clock :in std_logic;
+            clr : in std_logic;
+    
+            data_tx : in std_logic_vector(transaction_length - 1 downto 0);  -- data to be sent
+            data_tx_rdy : in std_logic; -- data ready to be written from data_tx register and starts the transimision in the next clock cycle
+    
+            --data_reg : out std_logic_vector(transaction_length - 1 downto 0);
+    
+            data_rx : out std_logic_vector(transaction_length - 1 downto 0);  -- data recieved from slave
+            data_rx_rdy : out std_logic; -- data ready to be read from data_rx register
+    
+            sck : out std_logic;
+            mosi :out std_logic;
+            miso :in std_logic;
+            cs :out std_logic
+    
+      ) ;
+    end component;
+    component fifo is
+        generic (
+        width : natural := 8;
+        depth : integer := 64);
+    port (
+        reset : in std_logic;
+        clock      : in std_logic;
+
+        -- FIFO Write Interface
+        write_en   : in  std_logic;
+        write_data : in  std_logic_vector(width-1 downto 0);
+        o_full    : out std_logic;
+
+        -- FIFO Read Interface
+        read_en   : in  std_logic;
+        read_data : out std_logic_vector(width-1 downto 0);
+        o_empty   : out std_logic);
+    end component;
+    component encoder is
+        port (    
+          clock : in std_logic;
           clr : in std_logic;
-      
-          data_tx : in std_logic_vector(7 downto 0);  -- data to be sent
-          data_tx_rdy : in std_logic; -- data ready to be written from data_tx register and starts the transimision in the next clock cycle
-      
-          --data_reg : out std_logic_vector(7 downto 0);
-      
-          data_rx : out std_logic_vector(7 downto 0);  -- data recieved from slave
-          data_rx_rdy : out std_logic; -- data ready to be read from data_rx register
+          old_dc_reg : in sfixed(10 downto 0);
+          dct_coeff_zz : in dct_coeff_zz_t;
+          encoding_done : out std_logic;
+          length_o : out integer range 0 to 512;
+          encoded_block : out std_logic_vector(511 downto 0)
+        ) ;
+    end component;   
+    component ac_huff_table is
+        port (
+          clock: in std_logic;
+          clr: in std_logic;
+          run_length: in integer range 0 to 63;
+          huff_value: in huff_value_t;
+          load : in std_logic;
+          huff_code: out huff_code_t;
+          code_ready: out std_logic
           
-          vcc: out std_logic;
-          gnd: out std_logic;
-          sck : out std_logic;
-          mosi :out std_logic;
-          miso :in std_logic;
-          cs :out std_logic
-      
         ) ;
       end component;
 end package;
