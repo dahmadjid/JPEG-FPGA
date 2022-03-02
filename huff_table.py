@@ -1,27 +1,27 @@
-import numpy as np
+# import numpy as np
 
-test =[[(j,i) for i in range(8) ] for j in range(8)]
-zigzag = np.array([
-    [0, 1, 5, 6, 14, 15, 27, 28],
-	[2, 4, 7, 13, 16, 26, 29, 42],
-	[3, 8, 12, 17, 25, 30, 41, 43],
-	[9, 11, 18, 24, 31, 40, 44, 53],
-	[10, 19, 23, 32, 39, 45, 52, 54],
-	[20, 22, 33, 38, 46, 51, 55, 60],
-	[21, 34, 37, 47, 50, 56, 59, 61],
-	[35, 36, 48, 49, 57, 58, 62, 63]])
-print(test)
-zigzag = zigzag.reshape(64)
+# test =[[(j,i) for i in range(8) ] for j in range(8)]
+# zigzag = np.array([
+#     [0, 1, 5, 6, 14, 15, 27, 28],
+# 	[2, 4, 7, 13, 16, 26, 29, 42],
+# 	[3, 8, 12, 17, 25, 30, 41, 43],
+# 	[9, 11, 18, 24, 31, 40, 44, 53],
+# 	[10, 19, 23, 32, 39, 45, 52, 54],
+# 	[20, 22, 33, 38, 46, 51, 55, 60],
+# 	[21, 34, 37, 47, 50, 56, 59, 61],
+# 	[35, 36, 48, 49, 57, 58, 62, 63]])
+# print(test)
+# zigzag = zigzag.reshape(64)
 
-print(zigzag)
-new2 = [i for i in range(64)]
-new = [0 for i in range(64)]
-i = 0
-test = np.array(test).reshape(64,2).tolist()
-for index in zigzag:
-    new[index] = new2[i]
-    i += 1
-print(new)
+# print(zigzag)
+# new2 = [i for i in range(64)]
+# new = [0 for i in range(64)]
+# i = 0
+# test = np.array(test).reshape(64,2).tolist()
+# for index in zigzag:
+#     new[index] = new2[i]
+#     i += 1
+# print(new)
 
 # text = "dct_coeff_zz <= ("
 # for j,i in new:
@@ -37,6 +37,9 @@ print(new)
  
 
 
+
+
+from numpy import byte
 
 
 HUFFMAN_CATEGORIES = (
@@ -57,6 +60,11 @@ HUFFMAN_CATEGORIES = (
     (*range(-16383, -8192 + 1), *range(8192, 16383 + 1)),
     (*range(-32767, -16384 + 1), *range(16384, 32767 + 1))
 )
+
+dc_y_huff = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+dc_c_huff = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+ac_y_huff = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+ac_c_huff = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
 
 HUFFMAN_CATEGORY_CODEWORD = {
     "DC": {
@@ -453,42 +461,182 @@ HUFFMAN_CATEGORY_CODEWORD = {
         }
     }
 }
+for key,value in HUFFMAN_CATEGORY_CODEWORD["DC"]["LUMINANCE"].items():
+    dc_y_huff[len(value)-1].append((value, key))
+    dc_y_huff[len(value)-1] = sorted(dc_y_huff[len(value)-1], key=lambda tup: int(tup[0]))
+
+for key,value in HUFFMAN_CATEGORY_CODEWORD["DC"]["CHROMINANCE"].items():
+    dc_c_huff[len(value)-1].append((value, key))
+    dc_c_huff[len(value)-1] = sorted(dc_c_huff[len(value)-1], key=lambda tup: int(tup[0]))
+for key,value in HUFFMAN_CATEGORY_CODEWORD["AC"]["LUMINANCE"].items():
+    if key == "EOB":
+        key = (0,0)
+    elif key == "ZRL":
+        key = (15,0)
+    ac_y_huff[len(value)-1].append((value, key[0]*16+key[1]))
+    ac_y_huff[len(value)-1] = sorted(ac_y_huff[len(value)-1], key=lambda tup: int(tup[0]))
+for key,value in HUFFMAN_CATEGORY_CODEWORD["AC"]["CHROMINANCE"].items():
+    if key == "EOB":
+        key = (0,0)
+    elif key == "ZRL":
+        key = (15,0)
+    ac_c_huff[len(value)-1].append((value, key[0]*16+key[1]))
+    ac_c_huff[len(value)-1] = sorted(ac_c_huff[len(value)-1], key=lambda tup: int(tup[0]))
+
+for i in range(len(dc_y_huff)):
+    for j in range(len(dc_y_huff[i])):
+        dc_y_huff[i][j] = dc_y_huff[i][j][1]
+for i in range(len(dc_c_huff)):
+    for j in range(len(dc_c_huff[i])):
+        dc_c_huff[i][j] = dc_c_huff[i][j][1]
+for i in range(len(ac_y_huff)):
+    for j in range(len(ac_y_huff[i])):
+        ac_y_huff[i][j] = ac_y_huff[i][j][1]
+for i in range(len(ac_c_huff)):
+    for j in range(len(ac_c_huff[i])):
+        ac_c_huff[i][j] = ac_c_huff[i][j][1]
 
 
-text = "("
-for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['LUMINANCE'].items():
-    pair = '("' + code.zfill(9) + '",' + str(len(code)) + "),"
-    text += pair
-text = text[:-1]  + ');\n\n('
-for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['CHROMINANCE'].items():
-    pair = '("' + code.zfill(11) + '",' + str(len(code)) + "),"
-    text += pair
-text = text[:-1]  + ');\n\n(('
-i = 0
-for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['LUMINANCE'].items():
-    if str(length) in "EOBZRL":
-        continue
-    pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
-    text += pair
-    if i == 9: 
-        text = text[:-1] + "),\n("
-        i = 0
-    else:
-        i += 1
-i = 0
-text = text[:-3] + ');\n\n((' 
-for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['CHROMINANCE'].items():
-    if str(length) in "EOBZRL":
-        continue
-    pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
-    text += pair
-    if i == 9: 
-        text = text[:-1] + "),\n("
-        i = 0
-    else:
-        i += 1
-text = text[:-3] + ');\n\n'
-with open("huff_table.txt" ,'w') as f:
-    f.write(text)
+dc_y_bytes = bytearray()
+dc_y_len = []
+for cat in dc_y_huff:
+    num_in_cat = len(cat)
+    dc_y_len.append(num_in_cat)
+    temp_dc_y_bytes = bytearray(cat)
+    # temp_dc_y_bytes.extend(cat)
+    dc_y_bytes.extend(temp_dc_y_bytes)
+temp = bytearray(dc_y_len)
+temp.extend(dc_y_bytes)
+dc_y_bytes = temp
+
+dc_c_bytes = bytearray()
+dc_c_len = []
+for cat in dc_c_huff:
+    num_in_cat = len(cat)
+    dc_c_len.append(num_in_cat)
+    temp_dc_c_bytes = bytearray(cat)
+    # temp_dc_c_bytes.extend(cat)
+    dc_c_bytes.extend(temp_dc_c_bytes)
+temp = bytearray(dc_c_len)
+temp.extend(dc_c_bytes)
+dc_c_bytes = temp
+
+ac_y_bytes = bytearray()
+ac_y_len = []
+for cat in ac_y_huff:
+
+    num_in_cat = len(cat)
+    ac_y_len.append(num_in_cat)
+    temp_ac_y_bytes = bytearray(cat)
+    # temp_ac_y_bytes.extend(cat)
+    ac_y_bytes.extend(temp_ac_y_bytes)
+temp = bytearray(ac_y_len)
+temp.extend(ac_y_bytes)
+ac_y_bytes = temp
+
+ac_c_bytes = bytearray()
+ac_c_len = []
+for cat in ac_c_huff:
+    num_in_cat = len(cat)
+    ac_c_len.append(num_in_cat)
+    temp_ac_c_bytes = bytearray(cat)
+    # temp_ac_c_bytes.extend(cat)
+    ac_c_bytes.extend(temp_ac_c_bytes)
+temp = bytearray(ac_c_len)
+temp.extend(ac_c_bytes)
+ac_c_bytes = temp
+# text = "("
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['LUMINANCE'].items():
+#     pair = '("' + code.zfill(9) + '",' + str(len(code)) + "),"
+#     text += pair
+# text = text[:-1]  + ');\n\n('
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['CHROMINANCE'].items():
+#     pair = '("' + code.zfill(11) + '",' + str(len(code)) + "),"
+#     text += pair
+# text = text[:-1]  + ');\n\n(('
+# i = 0
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['LUMINANCE'].items():
+#     if str(length) in "EOBZRL":
+#         continue
+#     pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
+#     text += pair
+#     if i == 9: 
+#         text = text[:-1] + "),\n("
+#         i = 0
+#     else:
+#         i += 1
+# i = 0
+# text = text[:-3] + ');\n\n((' 
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['CHROMINANCE'].items():
+#     if str(length) in "EOBZRL":
+#         continue
+#     pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
+#     text += pair
+#     if i == 9: 
+#         text = text[:-1] + "),\n("
+#         i = 0
+#     else:
+#         i += 1
+# text = text[:-3] + ');\n\n'
+# with open("huff_table.txt" ,'w') as f:
+#     f.write(text)
+
+lumi_table = bytearray([16,11,10,	16,	24,	40,	51,	61,12,	12,	14,	19,	26,	58,	60,	55,14,	13,	16,	24,	40,	57,	69,	56,14,	17,	22,	29,	51,	87,	80,	62,18,	22,	37,	56,	68,	109,103,77,24,	35,	55,	64,	81,	104,113,92,49,	64,	78,	87,	103,121,120,101,72,	92,	95,	98,	112,100,103,99])
+
+chromi_table = bytearray([17,	18,	24,	47,	99,	99,	99,	99, 18,	21,	26,	66,	99,	99,	99,	99, 24,	26,	56,	99,	99,	99,	99,	99, 47,	66,	99,	99,	99, 99,	99,	99, 99,	99	,99,99,	99,	99,	99,	99, 99,	99,	99,	99	,99	,99	,99,99 ,99	,99	,99,	99,	99,	99,	99,	99, 99,	99,	99,	99,	99,	99,	99,	99])
+
+jpeg_header = bytearray()
+app_header = bytearray([0xFF,0xD8,0xFF,0xE0,0x00,0x10,0x4A, 0x46, 0x49 ,0x46 ,0x00,0x01,0x01,0x01,0x00,0x78,0x00,0x78,0x00,0x00])
+quant_lumi_header = bytearray([0xFF, 0xDB, 0x00 ,0x43, 0x00])
+
+quant_chromi_header = bytearray([0xFF, 0xDB, 0x00 ,0x43, 0x01])
+quant_lumi_header.extend(lumi_table)
+quant_chromi_header.extend(chromi_table)
+
+frame_header = bytearray([0xFF,0xC0,0x00,0x11,0x08, 0x00,0x08,0x00,0x08,0x03,0x01,0x11,0x00,0x02,0x11,0x01,0x03,0x11,0x01])
+
+dc_y_header = bytearray([0xFF,0xC4,0x00,0x00,0x00])
+dc_y_header.extend(dc_y_bytes)
+# print(len(dc_y_header))
+dc_y_header[2] = (len(dc_y_header) - 2) - (len(dc_y_header) - 2) % 256
+dc_y_header[3] = (len(dc_y_header) - 2) % 256
+
+dc_c_header = bytearray([0xFF,0xC4,0x00,0x00,0x01])
+dc_c_header.extend(dc_c_bytes)
+# print(len(dc_c_header))
+dc_c_header[2] = (len(dc_c_header) - 2) - (len(dc_c_header) - 2) % 256
+dc_c_header[3] = (len(dc_c_header) - 2) % 256
+
+ac_y_header = bytearray([0xFF,0xC4,0x00,0x00,0x10])
+ac_y_header.extend(ac_y_bytes)
+# print(len(ac_y_header))
+ac_y_header[2] = (len(ac_y_header) - 2) - (len(ac_y_header) - 2) % 256
+ac_y_header[3] = (len(ac_y_header) - 2) % 256
+
+ac_c_header = bytearray([0xFF,0xC4,0x00,0x00,0x11])
+ac_c_header.extend(ac_c_bytes)
+# print(len(ac_c_header))
+ac_c_header[2] = (len(ac_c_header) - 2) - (len(ac_c_header) - 2) % 256
+ac_c_header[3] = (len(ac_c_header) - 2) % 256
+
+# print(ac_c_header)
+scan_header = bytearray([0xFF, 0xDA, 0x00, 0x0C, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00, 0x3F,0x00])
+scan_data = bytearray([0xDD,0xA0,0x00])
+# scan_header[2] = (len(scan_header) - 2) - (len(scan_header) - 2) % 256
+# scan_header[3] = (len(scan_header) - 2) % 256
 
 
+jpeg_header.extend(app_header)
+jpeg_header.extend(quant_lumi_header)
+jpeg_header.extend(quant_chromi_header)
+jpeg_header.extend(frame_header)
+jpeg_header.extend(dc_y_header)
+jpeg_header.extend(dc_c_header)
+jpeg_header.extend(ac_y_header)
+jpeg_header.extend(ac_c_header)
+jpeg_header.extend(scan_header)
+jpeg_header.extend(scan_data)
+jpeg_header.extend([0xFF,0xD9])
+with open("C:\\Users\\windows\\Desktop\\jpeg_file.jpg","wb") as f:
+    f.write(jpeg_header)
+# print(jpeg_header)
