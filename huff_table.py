@@ -39,6 +39,7 @@
 
 
 
+from operator import mod
 from numpy import byte
 
 
@@ -82,6 +83,7 @@ HUFFMAN_CATEGORY_CODEWORD = {
             10: '11111110',
             11: '111111110'     
         },
+        # 1110111111
         "CHROMINANCE":{  # 11bit code length
             0:  '00',
             1:  '01',
@@ -97,6 +99,7 @@ HUFFMAN_CATEGORY_CODEWORD = {
             11: '11111111110'   
         }
     },
+
     "AC": { # 16 bit code length 
         "LUMINANCE":{
             "EOB": '1010',  # (0, 0)
@@ -461,6 +464,46 @@ HUFFMAN_CATEGORY_CODEWORD = {
         }
     }
 }
+
+# ------------------------------------------------------------
+# HUFFMAN TABLE LOOKUP TABLE GENERATOR FOR VHDL
+# text = "("
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['LUMINANCE'].items():
+#     pair = '("' + code.zfill(9) + '",' + str(len(code)) + "),"
+#     text += pair
+# text = text[:-1]  + ');\n\n('
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['CHROMINANCE'].items():
+#     pair = '("' + code.zfill(11) + '",' + str(len(code)) + "),"
+#     text += pair
+# text = text[:-1]  + ');\n\n(('
+# i = 0
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['LUMINANCE'].items():
+#     if str(length) in "EOBZRL":
+#         continue
+#     pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
+#     text += pair
+#     if i == 9: 
+#         text = text[:-1] + "),\n("
+#         i = 0
+#     else:
+#         i += 1
+# i = 0
+# text = text[:-3] + ');\n\n((' 
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['CHROMINANCE'].items():
+#     if str(length) in "EOBZRL":
+#         continue
+#     pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
+#     text += pair
+#     if i == 9: 
+#         text = text[:-1] + "),\n("
+#         i = 0
+#     else:
+#         i += 1
+# text = text[:-3] + ');\n\n'
+# with open("huff_table.txt" ,'w') as f:
+#     f.write(text)
+# ------------------------------------------------------------------------------
+
 for key,value in HUFFMAN_CATEGORY_CODEWORD["DC"]["LUMINANCE"].items():
     dc_y_huff[len(value)-1].append((value, key))
     dc_y_huff[len(value)-1] = sorted(dc_y_huff[len(value)-1], key=lambda tup: int(tup[0]))
@@ -545,41 +588,6 @@ for cat in ac_c_huff:
 temp = bytearray(ac_c_len)
 temp.extend(ac_c_bytes)
 ac_c_bytes = temp
-# text = "("
-# for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['LUMINANCE'].items():
-#     pair = '("' + code.zfill(9) + '",' + str(len(code)) + "),"
-#     text += pair
-# text = text[:-1]  + ');\n\n('
-# for length,code in HUFFMAN_CATEGORY_CODEWORD['DC']['CHROMINANCE'].items():
-#     pair = '("' + code.zfill(11) + '",' + str(len(code)) + "),"
-#     text += pair
-# text = text[:-1]  + ');\n\n(('
-# i = 0
-# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['LUMINANCE'].items():
-#     if str(length) in "EOBZRL":
-#         continue
-#     pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
-#     text += pair
-#     if i == 9: 
-#         text = text[:-1] + "),\n("
-#         i = 0
-#     else:
-#         i += 1
-# i = 0
-# text = text[:-3] + ');\n\n((' 
-# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['CHROMINANCE'].items():
-#     if str(length) in "EOBZRL":
-#         continue
-#     pair = '("' + code.zfill(16) + '",' + str(len(code)) + "),"
-#     text += pair
-#     if i == 9: 
-#         text = text[:-1] + "),\n("
-#         i = 0
-#     else:
-#         i += 1
-# text = text[:-3] + ');\n\n'
-# with open("huff_table.txt" ,'w') as f:
-#     f.write(text)
 
 lumi_table = bytearray([16,11,10,	16,	24,	40,	51,	61,12,	12,	14,	19,	26,	58,	60,	55,14,	13,	16,	24,	40,	57,	69,	56,14,	17,	22,	29,	51,	87,	80,	62,18,	22,	37,	56,	68,	109,103,77,24,	35,	55,	64,	81,	104,113,92,49,	64,	78,	87,	103,121,120,101,72,	92,	95,	98,	112,100,103,99])
 
@@ -593,7 +601,7 @@ quant_chromi_header = bytearray([0xFF, 0xDB, 0x00 ,0x43, 0x01])
 quant_lumi_header.extend(lumi_table)
 quant_chromi_header.extend(chromi_table)
 
-frame_header = bytearray([0xFF,0xC0,0x00,0x11,0x08, 0x00,0x08,0x00,0x08,0x03,0x01,0x11,0x00,0x02,0x11,0x01,0x03,0x11,0x01])
+frame_header = bytearray([0xFF,0xC0,0x00,0x11,0x08, 0x00,0x10,0x00,0x10,0x03,0x01,0x11,0x00,0x02,0x11,0x01,0x03,0x11,0x01])
 
 dc_y_header = bytearray([0xFF,0xC4,0x00,0x00,0x00])
 dc_y_header.extend(dc_y_bytes)
@@ -621,9 +629,7 @@ ac_c_header[3] = (len(ac_c_header) - 2) % 256
 
 # print(ac_c_header)
 scan_header = bytearray([0xFF, 0xDA, 0x00, 0x0C, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00, 0x3F,0x00])
-scan_data = bytearray([0xDD,0xA0,0x00])
-# scan_header[2] = (len(scan_header) - 2) - (len(scan_header) - 2) % 256
-# scan_header[3] = (len(scan_header) - 2) % 256
+# scan_data = bytearray([0xDD,0xA0,0x00])
 
 
 jpeg_header.extend(app_header)
@@ -635,8 +641,115 @@ jpeg_header.extend(dc_c_header)
 jpeg_header.extend(ac_y_header)
 jpeg_header.extend(ac_c_header)
 jpeg_header.extend(scan_header)
+# jpeg_header.extend(scan_data)
+# jpeg_header.extend([0xFF,0xD9]) 
+
+
+
+
+
+bitwise_masks = [0x00, 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF]
+
+def shiftbybits(b_array, bits):
+    if bits == 0:
+        return b_array
+    modulo_bits = bits % 8
+    bytes_num = int(bits / 8)
+    print(bytes_num, modulo_bits)
+    output_array = bytearray([0 for i in range(bytes_num)])  # bytes shifting
+    output_array.extend(b_array)
+    if modulo_bits != 0: 
+        output_array.append(0)
+        prev = 0
+        for i in range(len(b_array)+1):
+            if i < len(b_array):
+                output_array[i+bytes_num] = (b_array[i] >> modulo_bits) + prev
+                prev = (b_array[i] & bitwise_masks[modulo_bits]) << (8 - modulo_bits)
+            else:
+                output_array[i+bytes_num] = prev
+
+    return output_array
+
+def add_arrays(arr1, arr2):
+
+    if len(arr1) > len(arr2):
+        length = len(arr1)
+    else:
+        length = len(arr2)
+    output_array = bytearray([0 for i in range(length)])
+    for i in range(length):
+        if i < len(arr1) and i < len(arr2):
+            output_array[i] = arr1[i] + arr2[i]
+        elif i >= len(arr2) and i < len(arr1):
+            output_array[i] = arr1[i]
+        elif i >= len(arr1) and i < len(arr2):
+            output_array[i] = arr2[i]
+
+    return output_array
+
+def concat(arr1, length1, arr2, length2): #length in bits
+    output = add_arrays(arr1, shiftbybits(arr2, length1))
+    
+    length = length1 + length2
+    return output, length
+
+
+length = 12
+scan_data = bytearray([240, 160])
+length_2 = 6
+scan_data2 = bytearray([40])
+
+#output = concat(scan_data,length,scan_data2,length_2)
+# output = shiftbybits(scan_data2, 4)
+# for element in output:
+#     print(element, end = ', ')
+
+import serial
+    
+esp = serial.Serial("COM5", 115200 , timeout = None)
+data = []
+scan_data = bytearray([0])
+scan_data_length = 0
+i = 0
+while True:
+    if esp.in_waiting:
+        data = esp.readline()
+    else:
+        break
+i = 0
+import time
+while True:
+    if esp.in_waiting:
+        
+        data = esp.readline().decode()
+        data = data.split(" ")[:-1]
+        length = int(data[0]) * 256 + int(data[1])
+        data = data[2:]
+        new_data = bytearray()
+        for b in data:
+            if int(b) == 0xff:
+                new_data.append(int(b))
+                new_data.append(0)
+                length += 8
+            else:
+                new_data.append(int(b))
+        scan_data, scan_data_length = concat(scan_data, scan_data_length, new_data, length)
+        print(scan_data, scan_data_length)
+        i = 0
+    else:
+        if i == 10:
+            break
+        else:
+            i+= 1
+            
+            time.sleep(1)
+# scan_data, length = concat(bytearray([239,255,0, 200, 160]), 40, bytearray([0]), 4)
+# print(scan_data, length)
+# scan_data, length = concat(scan_data, length, bytearray([240, 10, 0]), 24)
+# print(scan_data, length)
 jpeg_header.extend(scan_data)
-jpeg_header.extend([0xFF,0xD9])
-with open("C:\\Users\\windows\\Desktop\\jpeg_file.jpg","wb") as f:
-    f.write(jpeg_header)
+jpeg_header.extend(bytearray([0xFF, 0xD9]))
 # print(jpeg_header)
+
+with open("C:\\Users\\windows\\Desktop\\jpeg_file_from_fpga.jpg","wb") as f:
+    f.write(jpeg_header)

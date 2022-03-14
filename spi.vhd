@@ -43,7 +43,7 @@ begin
     data_rx <= data_rx_reg;
     cs <= cs_s;
     sck <= sck_s;
-    mosi <= data_tx_reg(transaction_length - 1 - bit_count);
+    mosi <= data_tx(transaction_length - 1 - bit_count);
 
     --chip select 
     chip_select : process(data_tx_rdy,bit_count)
@@ -53,7 +53,7 @@ begin
 
         elsif falling_edge(data_tx_rdy)  then
             cs_s <= '0';
-            data_tx_reg <= data_tx; -- x"31323334353637383930415A4552545955494F505153444647484A4B4C4D57584356424E617A6572747975696F707173646667686A6B6C6D77786376626E3F00";  -- "hello from fpga\0" --data_tx;
+            --data_tx_reg <= data_tx; -- x"31323334353637383930415A4552545955494F505153444647484A4B4C4D57584356424E617A6572747975696F707173646667686A6B6C6D77786376626E3F00";  -- "hello from fpga\0" --data_tx;
         end if;
     end process ; -- chip_select
 

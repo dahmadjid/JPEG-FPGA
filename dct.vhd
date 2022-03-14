@@ -16,7 +16,7 @@ entity dct is
     --v_u_index : in unsigned(5 downto 0);
     --y_x_index : in unsigned(5 downto 0);
     y,x : in integer range 0 to 7;
-    const : in sfixed(1 downto -16);
+    const : in sfixed(1 downto -20);
 
     dct_coeff : out sfixed(10 downto 0)
     
@@ -26,10 +26,8 @@ end dct;
 
 architecture arch of dct is
    
-    signal cos_u,cos_v: sfixed(1 downto -16);
-    signal cos_mat_a: cos_mat_t;
-    signal cos_mat_b: cos_mat_t;
-    
+    signal cos_u,cos_v: sfixed(1 downto -20);
+
     -- signal u_reg,v_reg,x_reg,y,reg : unsigned(2 downto 0);
 begin
 
@@ -40,9 +38,9 @@ begin
 
     dct_pr : process(clock,dct_working)
     variable dct_coeff_reg : sfixed(10 downto 0);
-    variable dct_coeff_s,dct_coeff_temp2 : sfixed(10 downto -16);
-    variable dct_coeff_temp : sfixed(14 downto -48);
-    variable dct_coeff_temp3 : sfixed(11 downto -16);
+    variable dct_coeff_s,dct_coeff_temp2 : sfixed(10 downto -20);
+    variable dct_coeff_temp : sfixed(14 downto -60);
+
     
     begin
         if dct_working = '0' then
@@ -52,9 +50,9 @@ begin
             
             dct_coeff_temp := dct_coeff_s + cos_u * cos_v * const * img_pixel;
             if dct_coeff_temp(14) = '1' then
-                dct_coeff_s := '1'&dct_coeff_temp(9 downto -16);
+                dct_coeff_s := '1'&dct_coeff_temp(9 downto -20);
             else
-                dct_coeff_s := '0'&dct_coeff_temp(9 downto -16);
+                dct_coeff_s := '0'&dct_coeff_temp(9 downto -20);
             end if;
 
             -- dct_coeff_s := resize(dct_coeff_s + img_pixel,10,0) ;

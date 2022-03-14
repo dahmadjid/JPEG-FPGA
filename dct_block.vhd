@@ -30,10 +30,10 @@ entity dct_block is
 end dct_block ;
 
 architecture arch of dct_block is
-    signal end_delay_count: integer range 0 to 3:=0;
+    signal end_delay_count: integer range 0 to 3 := 0;
     signal clock_count : integer range 0 to 4;
     signal y_x_index : unsigned(5 downto 0);
-    signal const_1,const_2,const_3 : sfixed(1 downto -16);
+    signal const_1,const_2,const_3 : sfixed(1 downto -20);
     signal dct_working_s,dct_finished: std_logic := '0';
     signal y,x : integer range 0 to 7 := 0;
     signal img : image_block_t;
@@ -61,9 +61,10 @@ begin
         end if;
     end if;
 end process ; --y_x_index
-const_1 <="000010000000000000";  -- u,v = 0
-const_2 <="000010110101000001";  -- u or v = 0
-const_3 <="000100000000000000";  -- else
+
+const_1 <="0000100000000000000000";  -- u,v = 0  1/8
+const_2 <="0000101101010000010011";  -- u or v = 0
+const_3 <="0001000000000000000000";  -- else 1/4
 
 dct_working_s_pr : process(dct_start,dct_finished)
 begin

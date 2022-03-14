@@ -10,6 +10,7 @@ entity ac_huff_table is
   port (
     clock: in std_logic;
     clr: in std_logic;
+    channel : in integer range 0 to 2;
     run_length: in integer range 0 to 63;
     huff_value: in huff_value_t;
     load : in std_logic;
@@ -22,7 +23,7 @@ end ac_huff_table;
 architecture arch of ac_huff_table is
 
     signal delay_counter : integer range 0 to 2;
-    signal ac_code : ac_code_t;
+    signal ac_code, y_ac_code, c_ac_code : ac_code_t;
     signal start : std_logic;
 begin
     start_pr : process( clock )
@@ -40,7 +41,8 @@ begin
                 code_ready <= '0';
                 delay_counter <= 0;
             elsif delay_counter = 0 and start = '1' then
-                ac_code <= y_ac_codes(run_length)(huff_value.code_length);
+                y_ac_code <= y_ac_codes(run_length)(huff_value.code_length);
+                c_ac_code <= c_ac_codes(run_length)(huff_value.code_length);
                 code_ready <= '0';
                 delay_counter <= 1;
             elsif delay_counter = 1 and start = '1' then
@@ -49,5 +51,6 @@ begin
             end if;
         end if;
     end process ; -- table
+    ac_code <= y_ac_code when channel = 0 else c_ac_code;
     huff_code <= ac_code + huff_value;
 end arch ; -- arch

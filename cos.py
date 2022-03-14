@@ -1,5 +1,8 @@
 import math
 import numpy as np
+import os
+
+os.chdir("C:\\codes\\JPEG FPGA\\")
 # def decimal_converter(num): 
     
 #     while num > 1:
@@ -111,15 +114,15 @@ for v in range(8):
     for y in range(8):
         cos_y = math.cos((2*y+1)*v*math.pi/16)
 
-        cos = round(cos_y,3)
+        cos = cos_y
         if cos == 1.0:
-            code += '"010000000000000000"' + ' when "'+countlist[v] + countlist[y] +'",\n'
+            code += '"0100000000000000000000"' + ' when "'+countlist[v] + countlist[y] +'",\n'
         elif cos == -1.0:
-            code += '"110000000000000000"' + ' when "'+countlist[v] + countlist[y] +'",\n'
+            code += '"1100000000000000000000"' + ' when "'+countlist[v] + countlist[y] +'",\n'
         elif cos < 0:
-            code += '"'+twosComp('00'+decToBin(cos,2,16)[1:]) + '" when "'+countlist[v] + countlist[y] +'",\n'
+            code += '"'+twosComp('00'+decToBin(cos,2,20)[1:]) + '" when "'+countlist[v] + countlist[y] +'",\n'
         else:
-            code += '"00'+decToBin(cos,2,16)[1:] + '" when "'+countlist[v] + countlist[y] +'",\n'
+            code += '"00'+decToBin(cos,2,20)[1:] + '" when "'+countlist[v] + countlist[y] +'",\n'
         if cos< 0.1:
             print(cos)
 
@@ -132,44 +135,44 @@ with open("cos.txt","w") as f:
 
 
 
-table = ""
-lumi_table = [16,11,10,	16,	24,	40,	51,	61,12,	12,	14,	19,	26,	58,	60,	55,14,	13,	16,	24,	40,	57,	69,	56,14,	17,	22,	29,	51,	87,	80,	62,18,	22,	37,	56,	68,	109,103,77,24,	35,	55,	64,	81,	104,113,92,49,	64,	78,	87,	103,121,120,101,72,	92,	95,	98,	112,100,103,99]
-lumi_table = np.array(lumi_table).reshape(8,8)
-chromi_table = [17,	18,	24,	47,	99,	99,	99,	99, 18,	21,	26,	66,	99,	99,	99,	99, 24,	26,	56,	99,	99,	99,	99,	99, 47,	66,	99,	99,	99, 99,	99,	99, 99,	99	,99,99,	99,	99,	99,	99, 99,	99,	99,	99	,99	,99	,99,99 ,99	,99	,99,	99,	99,	99,	99,	99, 99,	99,	99,	99,	99,	99,	99,	99]
-chromi_table = np.array(chromi_table).reshape(8,8)
-i = 0
-for row in lumi_table:
-    for val in row:
+# table = ""
+# lumi_table = [16,11,10,	16,	24,	40,	51,	61,12,	12,	14,	19,	26,	58,	60,	55,14,	13,	16,	24,	40,	57,	69,	56,14,	17,	22,	29,	51,	87,	80,	62,18,	22,	37,	56,	68,	109,103,77,24,	35,	55,	64,	81,	104,113,92,49,	64,	78,	87,	103,121,120,101,72,	92,	95,	98,	112,100,103,99]
+# lumi_table = np.array(lumi_table).reshape(8,8)
+# chromi_table = [17,	18,	24,	47,	99,	99,	99,	99, 18,	21,	26,	66,	99,	99,	99,	99, 24,	26,	56,	99,	99,	99,	99,	99, 47,	66,	99,	99,	99, 99,	99,	99, 99,	99	,99,99,	99,	99,	99,	99, 99,	99,	99,	99	,99	,99	,99,99 ,99	,99	,99,	99,	99,	99,	99,	99, 99,	99,	99,	99,	99,	99,	99,	99]
+# chromi_table = np.array(chromi_table).reshape(8,8)
+# i = 0
+# for row in lumi_table:
+#     for val in row:
         
-        if i == 0:
-            table += '('
-        table += '"00'+decToBin(1/val,2,16)[1:].ljust(16,'0')+'",'
-        if i == 7:
-            table=table[:-1]+"),\n"
-            i = 0
-        else:
-            i += 1
+#         if i == 0:
+#             table += '('
+#         table += '"00'+decToBin(1/val,2,16)[1:].ljust(16,'0')+'",'
+#         if i == 7:
+#             table=table[:-1]+"),\n"
+#             i = 0
+#         else:
+#             i += 1
 
-with open("luminance_table.txt",'w') as f:
-    f.write(table)
-table = ""
+# with open("luminance_table.txt",'w') as f:
+#     f.write(table)
+# table = ""
 
-i = 0
-for row in chromi_table:
-    for val in row:
+# i = 0
+# for row in chromi_table:
+#     for val in row:
         
-        if i == 0:
-            table += '('
-        table += '"00'+decToBin(1/val,2,16)[1:].ljust(16,'0')+'",'
-        if i == 7:
-            table=table[:-1]+"),\n"
-            i = 0
-        else:
-            i += 1
+#         if i == 0:
+#             table += '('
+#         table += '"00'+decToBin(1/val,2,16)[1:].ljust(16,'0')+'",'
+#         if i == 7:
+#             table=table[:-1]+"),\n"
+#             i = 0
+#         else:
+#             i += 1
 
-with open("chrominance_table.txt",'w') as f:
-    f.write(table)
+# with open("chrominance_table.txt",'w') as f:
+#     f.write(table)
 
-print(decToBin(0.0588,2,16))
-print(decToBin(1/16,2,16)[1:].ljust(16,'0'))
-print(len("000000111100001111"))
+print(decToBin((1/4)*1/math.sqrt(2),2,32))
+print(decToBin(1/8,2,32)[1:].ljust(32,'0'))
+print(len("0000101101010000010011110011001100"))

@@ -139,8 +139,8 @@ package jpeg_pkg is
     constant y_zrl : std_logic_vector(10 downto 0) := "11111111001";
     constant y_eob : huff_code_t := ("101000000000000000000000000",4);
 
-    constant c_zrl : huff_code_t := ("000000000000000000000000000",2);
-    constant c_eob : huff_code_t := ("111111101000000000000000000",10);
+    constant c_eob : huff_code_t := ("000000000000000000000000000",2);
+    constant c_zrl : std_logic_vector(9 downto 0) := "1111111010";
 
     function "+"( y_dc_code : y_dc_code_t; huff_value : huff_value_t) return huff_code_t;
     function "+" ( c_dc_code : c_dc_code_t; huff_value : huff_value_t) return huff_code_t;
@@ -152,15 +152,10 @@ package jpeg_pkg is
         port 
         (
         u,x : in unsigned(2 downto 0);     -- or v,y
-        c : out sfixed(1 downto -16)       --c is cos in signed fixed point
+        c : out sfixed(1 downto -20)       --c is cos in signed fixed point
         );
     end component;
-    component constant_comp is  
-        port (
-        u,v : in unsigned(2 downto 0);
-        const : out sfixed(1 downto -16)
-        ) ;
-    end component;
+   
     component dct is
         port (
             v,u: in unsigned(2 downto 0);
@@ -169,7 +164,7 @@ package jpeg_pkg is
             --v_u_index : in unsigned(5 downto 0);
             --y_x_index : in unsigned(5 downto 0);
             y,x : in integer range 0 to 7;
-            const : in sfixed(1 downto -16);
+            const : in sfixed(1 downto -20);
             dct_coeff : out sfixed(10 downto 0)
         ) ;
     end component;
@@ -199,19 +194,14 @@ package jpeg_pkg is
             huff_value_zz : out huff_value_zz_t
         ) ;
       end component;
-    component y_quantizer is
+    component quantizer is
     port (
       dct_coeff_block : in dct_coeff_block_t;
+      channel : in integer range 0 to 2;
       dct_coeff_qz : out dct_coeff_block_t
     ) ;
     end component;
 
-    component c_quantizer is
-    port (
-      dct_coeff_block : in dct_coeff_block_t;
-      dct_coeff_qz : out dct_coeff_block_t
-    ) ;
-    end component;
     component bram_ip
 	port
 	(
@@ -293,6 +283,7 @@ package jpeg_pkg is
         port (    
           clock : in std_logic;
           clr : in std_logic;
+          channel : in integer range 0 to 2;
           old_dc_reg : in sfixed(10 downto 0);
           dct_coeff_zz : in dct_coeff_zz_t;
           encoding_done : out std_logic;
@@ -304,6 +295,7 @@ package jpeg_pkg is
         port (
           clock: in std_logic;
           clr: in std_logic;
+          channel : in integer range 0 to 2;
           run_length: in integer range 0 to 63;
           huff_value: in huff_value_t;
           load : in std_logic;
