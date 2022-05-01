@@ -99,10 +99,29 @@ lumi_table = [16,11,10,	16,	24,	40,	51,	61,12,	12,	14,	19,	26,	58,	60,	55,14,	13
 
 chromi_table = [17,	18,	24,	47,	99,	99,	99,	99, 18,	21,	26,	66,	99,	99,	99,	99, 24,	26,	56,	99,	99,	99,	99,	99, 47,	66,	99,	99,	99, 99,	99,	99, 99,	99	,99,99,	99,	99,	99,	99, 99,	99,	99,	99	,99	,99	,99,99 ,99	,99	,99,	99,	99,	99,	99,	99, 99,	99,	99,	99,	99,	99,	99,	99]
 
-print(cv2.dct(np.array(block_list_y[0],dtype = "float32")))
-print(cv2.dct(np.array(block_list_cb[0],dtype = "float32")))
-print(cv2.dct(np.array(block_list_cr[0],dtype = "float32")))
+y_coeff = cv2.dct(np.array(block_list_y[1],dtype = "float32"))
+cb_coeff = cv2.dct(np.array(block_list_cb[1],dtype = "float32"))
+cr_coeff = cv2.dct(np.array(block_list_cr[1],dtype = "float32"))
 
+y_coeff = np.array(y_coeff, dtype= 'int32')
+cb_coeff = np.array(cb_coeff, dtype= 'int32')
+cr_coeff = np.array(cr_coeff, dtype= 'int32')
+print("----------------------------------")
+print("----------------------------------")
+print(y_coeff)
+print(cb_coeff)
+print(cr_coeff)
+for i in range(8):
+    for j in range(8):
+        index = i*8 + j
+        y_coeff[i][j] = int(y_coeff[i][j] / lumi_table[index])
+        cb_coeff[i][j] = int(cb_coeff[i][j] / chromi_table[index])
+        cr_coeff[i][j] = int(cr_coeff[i][j] / chromi_table[index])
+print("----------------------------------")
+print("----------------------------------")
+print(y_coeff)
+print(cb_coeff)
+print(cr_coeff)
 # print(dct_coeff)
 # def add_binary_nums(x, y):
 #     max_len = max(len(x), len(y))

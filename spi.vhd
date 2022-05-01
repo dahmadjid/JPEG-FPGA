@@ -83,17 +83,17 @@ begin
         end if ;
     end process ; -- bit_count_pr
 
-    -- miso 
-    -- miso_pr : process(sck_s,clr)
-    --     begin
-    --         if clr = '0' then
-    --             data_rx_reg <= (others => '0');
-    --         elsif falling_edge(sck_s) and cs_s = '0' then
-    --             data_rx_reg(0) <= miso;
-    --             data_rx_reg(transaction_length - 1 downto 1) <= data_rx_reg(transaction_length - 2 downto 0);
-    --             -- data_rx_reg(transaction_length - 1 - bit_count) <= miso;
-    --         end if;
-    -- end process ; -- miso_pr
+    
+    miso_pr : process(sck_s,clr)
+        begin
+            if clr = '0' then
+                data_rx_reg <= (others => '0');
+            elsif falling_edge(sck_s) and cs_s = '0' then
+                -- data_rx_reg(0) <= miso;
+                -- data_rx_reg(transaction_length - 1 downto 1) <= data_rx_reg(transaction_length - 2 downto 0);
+                data_rx_reg(transaction_length - 1 - bit_count) <= miso;
+            end if;
+    end process ; -- miso_pr
 
     data_rx_rdy <= cs_s;
 

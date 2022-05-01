@@ -10,7 +10,7 @@ entity ac_huff_table is
   port (
     clock: in std_logic;
     clr: in std_logic;
-    channel : in integer range 0 to 2;
+    channel : in integer range 0 to 3;
     run_length: in integer range 0 to 63;
     huff_value: in huff_value_t;
     load : in std_logic;

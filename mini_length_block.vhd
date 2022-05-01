@@ -6,8 +6,12 @@ use ieee_proposed.fixed_pkg.all;
 use work.jpeg_pkg.all;
 entity mini_length_block is
   port (
-      clock :in std_logic;
-    dc_diff : in sfixed(11 downto 0);
+    clock : in std_logic;
+    increment_block_count : in std_logic;
+    channel : in integer range 0 to 3;
+    old_dc_reg_y : in sfixed(10 downto 0);
+    old_dc_reg_cb : in sfixed(10 downto 0);
+    old_dc_reg_cr : in sfixed(10 downto 0);
     dct_coeff_zz : in dct_coeff_zz_t;
     huff_value_zz : out huff_value_zz_t
   ) ;
@@ -18,12 +22,54 @@ architecture arch of mini_length_block is
     signal temp: sfixed(11 downto 0);
     signal huff_value_temp : sfixed(10 downto 0);
     signal temp2: sfixed(11 downto 0);
+    signal dc_diff : sfixed(11 downto 0);
+    signal y_dc_diff, cb_dc_diff, cr_dc_diff: sfixed(11 downto 0);
+    signal khra : integer;
 begin
 
+    -- dc_diff <= dct_coeff_zz(0) - old_dc_reg;
+    khraazeaea : process( clock )
+    begin
+        if channel = 3 then
+            khra <= 0;
+        elsif rising_edge(increment_block_count) then
+            khra <= 1;
+        end if ;
+    end process ; -- khra
+    pro_ta3_khra : process( clock )
+    variable tempaze, tempaze2, tempaze3, tempaze4 : integer;
+    begin
+        if rising_edge(clock) and khra = 0 then
+            y_dc_diff <= '0'&dct_coeff_zz(0);
+            cb_dc_diff <= '0'&dct_coeff_zz(0);
+            cr_dc_diff <= '0'&dct_coeff_zz(0);
+
+
+        elsif rising_edge(clock) and khra = 1 then
+            tempaze := to_integer(dct_coeff_zz(0)); 
+            tempaze2 := to_integer(old_dc_reg_y); 
+            tempaze3 := to_integer(old_dc_reg_cb); 
+            tempaze4 := to_integer(old_dc_reg_cr); 
+
+            y_dc_diff <= to_sfixed(tempaze - tempaze2, 11, 0);
+            cb_dc_diff <= to_sfixed(tempaze - tempaze3, 11, 0);
+            cr_dc_diff <= to_sfixed(tempaze - tempaze4, 11, 0);
+
+
+
+        end if ; 
+    end process ; -- pro_ta3_khra
+    -- cb_dc_diff <= '0'&dct_coeff_zz(0);
+    -- cr_dc_diff <= '0'&dct_coeff_zz(0);
+
+    dc_diff <= y_dc_diff when channel = 0 else cb_dc_diff when channel = 1 else cr_dc_diff when channel = 2 else y_dc_diff;
+    --dc_diff <= y_dc_diff;
     with dc_diff(11) select
     temp <= resize(not dc_diff + 1,11,0) when '1', dc_diff when others;
-temp2 <= not temp when dc_diff(11) = '1' else temp;
-length_temp <= 
+    
+    temp2 <= not temp when dc_diff(11) = '1' else temp;
+
+    length_temp <= 
     "1011" when temp(11) = '1' else
     "1011" when temp(10) = '1' else
     "1010" when temp(9) = '1' else
@@ -88,7 +134,8 @@ huff_value_zz(0) <= (std_logic_vector(huff_value_temp),to_integer(length_temp));
 
 
 mini_length_gen :for i in 1 to 63 generate  --AC
-    mini_length_comp : mini_length port map(dct_coeff_zz(i),huff_value_zz(i));
+    huff_value_zz(i) <= ("00000000000", 0);
+    -- mini_length_comp : mini_length port map (dct_coeff_zz(i), huff_value_zz(i));
 end generate;
 
 

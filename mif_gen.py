@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import os
-os.chdir("C:\\Codes\\JPEG FPGA")
+os.chdir("/home/madjid/Codes/JPEG FPGA/")
 def add_binary_nums(x, y):
         max_len = max(len(x), len(y))
  
@@ -100,26 +100,41 @@ for i in range(len(img)):
         if int(y) > 128 or int(cb)  > 128 or int(cr)  > 128 :
             print("FUCK")
 
-mif = "DEPTH = 262144;\nWIDTH = 8;\nADDRESS_RADIX = UNS;\nDATA_RADIX = BIN;\nCONTENT BEGIN\n"
+# mif = "DEPTH = 262144;\nWIDTH = 8;\nADDRESS_RADIX = UNS;\nDATA_RADIX = BIN;\nCONTENT BEGIN\n"
+
+text = "char y[4][64] = {"
 r,g,b = img[:,:,0],img[:,:,1],img[:,:,2]  
-print(g)
+
 for channel in range(3):     
     for row_block_index in range(int(height/8)):
         for col_block_index in range(int(width/8)):
             blocks = [r[0+8*row_block_index:8+8*row_block_index,  0+8*col_block_index: 8+8*col_block_index], g[0+8*row_block_index:8+8*row_block_index,  0+8*col_block_index: 8+8*col_block_index] ,b[0+8*row_block_index:8+8*row_block_index,  0+8*col_block_index: 8+8*col_block_index]]
             block = blocks[channel]
+            dct_block = cv2.dct(np.array(block, dtype = "float32"))
+            print(dct_block)
+
+            text += "{"
             for i in range(8):
+                text += "\n"
                 for j in range(8):
-                    address = str(i*8+j + row_block_index*8*width + col_block_index*64 + width*height*channel )
-                    data = bin(abs(block[i,j]))[2:].zfill(8)
-                    if r[i,j] < 0:
-                        data = twosComp(data)
-                    line = address+' : '+data +";\n"
-                    # print(line)
-                    mif+= line
-mif += "END;"
-with open("img_ycbcr.mif",'w') as f:
-    f.write(mif)
+                    # address = str(i*8+j + row_block_index*8*width + col_block_index*64 + width*height*channel )
+                    # data = bin(abs(block[i,j]))[2:].zfill(8)
+                    # print(block[i,j], " : ",data)
+                    # if block[i,j] < 0:
+                    #     data = twosComp(data)
+                    # line = address+' : '+data +";\n"
+                    # # print(line)
+                    # mif+= line
+                    text += str(block[i, j]) + ", "
+            text = text[:-2]+ "},\n "
+    text += "};\nchar c[4][64] = {"
+
+# mif += "END;"
+text = text[:-3] +  "};"
+with open("c_array.txt",'w') as f:
+    f.write(text)
+# with open("img_ycbcr.mif",'w') as f:
+#     f.write(mif)
 # for i in range(len(r)):
 #     for j in range(len(r[0])):
 

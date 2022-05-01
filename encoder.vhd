@@ -11,10 +11,11 @@ use work.jpeg_pkg.all;
 -- TODO: potential ZRL bug, ZRL may mean 16 zeros not 15 because its (F, 0), should be easy fix
 entity encoder is
   port (    
+
     clock : in std_logic;
     clr : in std_logic;
-    channel : in integer range 0 to 2;
-    old_dc_reg : in sfixed(10 downto 0);
+    increment_block_count : in std_logic;
+    channel : in integer range 0 to 3;
     dct_coeff_zz : in dct_coeff_zz_t;
     encoding_done : out std_logic;
     length_o : out integer range 0 to 512;
@@ -25,18 +26,19 @@ end encoder;
 
 architecture arch of encoder is
     signal y_dc_code : y_dc_code_t ;
+    signal c_dc_code : c_dc_code_t ;
     signal y_ac_code : ac_code_t ;
     signal dc_huff_value,ac_huff_value : huff_value_t;
-    signal huff_code, dc_huff_code, eob : huff_code_t;
+    signal huff_code, dc_huff_code, dc_huff_code_y ,dc_huff_code_c, eob : huff_code_t;
     signal dc_coeff_diff : sfixed(11 downto 0);
     signal code_ready,encoding_done_s,delay, table_load, manual,concat, concat_done, length_add, length_add_reset : std_logic;
     signal zrl_flag : std_logic_vector(2 downto 0) := "000";
-    signal ac_huff_code,ac_huff_code_2 : huff_code_t;
+    signal ac_huff_code,ac_huff_code_2, temp_reg : huff_code_t;
     signal run_length : integer range 0 to 63 := 0;
     signal huff_code_index : integer range 0 to 63 := 0;
     signal encoded_block_s : std_logic_vector(511 downto 0);
     signal length : integer range 0 to 512;
-    
+    signal prev_dc_y, prev_dc_cb, prev_dc_cr : sfixed(10 downto 0) := "00000000000";
     signal huff_value_zz : huff_value_zz_t;
     signal temp : std_logic_vector(511 downto 0);
     shared variable temp_y, temp_y2, temp_c, temp_c2 : std_logic_vector(511 downto 0);
@@ -44,16 +46,33 @@ begin
     length_o <= length;
     encoding_done <= encoding_done_s;
     encoded_block <= encoded_block_s;
-    dc_coeff_diff <= dct_coeff_zz(0) - old_dc_reg; 
 
-    mini_length_comp : mini_length_block port map(dc_coeff_diff, dct_coeff_zz,huff_value_zz);
+    old_dc_reg_pr : process(clock )
+    begin  
+        
+        if rising_edge(clock) and encoding_done_s = '1' then
+            if channel = 0 then
+                prev_dc_y <= dct_coeff_zz(0);
+            elsif channel = 1 then
+                prev_dc_cb <= dct_coeff_zz(0);
+            elsif channel = 2 then
+                prev_dc_cr <= dct_coeff_zz(0);
+            end if;
+        end if;
+    end process ; -- old_dc_reg_pr
+    
+    mini_length_comp : mini_length_block port map(clock,increment_block_count ,channel , prev_dc_y, prev_dc_cb, prev_dc_cr, dct_coeff_zz, huff_value_zz);
 
     eob <= y_eob when channel = 0 else c_eob;
 
     y_dc_code <= y_dc_codes(huff_value_zz(0).code_length);
-    dc_huff_value<= huff_value_zz(0);
-    dc_huff_code <= y_dc_code + dc_huff_value;
-
+    c_dc_code <= c_dc_codes(huff_value_zz(0).code_length);
+    
+    dc_huff_value <= huff_value_zz(0);
+    dc_huff_code_y <= y_dc_code + dc_huff_value;
+    dc_huff_code_c <= c_dc_code + dc_huff_value;
+    dc_huff_code <= dc_huff_code_y when channel = 0 else dc_huff_code_c;
+    
     ac_huff_value <= huff_value_zz(huff_code_index);
     ac_table_comp : ac_huff_table port map(clock, clr, channel, run_length, ac_huff_value, table_load, ac_huff_code, code_ready);
     
@@ -148,14 +167,21 @@ begin
 
     huff_code_pro : process( clock )
     begin
-        if huff_code_index = 0 then
-            huff_code <= dc_huff_code;    -- dc code
-        elsif ac_huff_value.code_length = 0 and huff_code_index = 63 then
-            huff_code <= eob;
-        else
-            huff_code <= ac_huff_code;
+        if rising_edge(clock) then
+            if huff_code_index = 0 then
+                huff_code <= dc_huff_code;    -- dc code
+            elsif ac_huff_value.code_length = 0 and huff_code_index = 63 then
+                huff_code <= eob;
+            else
+                huff_code <= ac_huff_code;
+            end if;
         end if;
+
     end process ; -- huff_code_pro
+
+
+
+
 
     writing_pr_y  : process(clock)    
     begin
@@ -235,7 +261,7 @@ begin
 
 
     falling_edge_encoded_block_output : process(clock )
-        variable delay_counter : integer range 0 to 2;
+        variable delay_counter : integer range 0 to 3;
     begin
         if clr = '0'  then
             encoded_block_s <= (others => '0');
@@ -252,6 +278,9 @@ begin
                 concat_done <= '0';
                 delay_counter := 2;
             elsif delay_counter = 2 then
+                delay_counter := 3;
+                concat_done <= '0';
+            elsif delay_counter = 3 then
                 delay_counter := 0;
                 concat_done <= '1';
             end if;

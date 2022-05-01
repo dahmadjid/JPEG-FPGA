@@ -600,7 +600,8 @@ quant_lumi_header = bytearray([0xFF, 0xDB, 0x00 ,0x43, 0x00])
 quant_chromi_header = bytearray([0xFF, 0xDB, 0x00 ,0x43, 0x01])
 quant_lumi_header.extend(lumi_table)
 quant_chromi_header.extend(chromi_table)
-
+width = 16
+height = 192
 frame_header = bytearray([0xFF,0xC0,0x00,0x11,0x08, 0x00,0x10,0x00,0x10,0x03,0x01,0x11,0x00,0x02,0x11,0x01,0x03,0x11,0x01])
 
 dc_y_header = bytearray([0xFF,0xC4,0x00,0x00,0x00])
@@ -706,7 +707,7 @@ scan_data2 = bytearray([40])
 
 import serial
     
-esp = serial.Serial("COM5", 115200 , timeout = None)
+esp = serial.Serial("/dev/ttyUSB0", 115200 , timeout = None)
 data = []
 scan_data = bytearray([0])
 scan_data_length = 0
@@ -717,15 +718,18 @@ while True:
     else:
         break
 i = 0
+k = 0
 import time
 while True:
     if esp.in_waiting:
         
         data = esp.readline().decode()
         data = data.split(" ")[:-1]
+        
         length = int(data[0]) * 256 + int(data[1])
         data = data[2:]
         new_data = bytearray()
+        
         for b in data:
             if int(b) == 0xff:
                 new_data.append(int(b))
@@ -733,11 +737,12 @@ while True:
                 length += 8
             else:
                 new_data.append(int(b))
+        
         scan_data, scan_data_length = concat(scan_data, scan_data_length, new_data, length)
         print(scan_data, scan_data_length)
         i = 0
     else:
-        if i == 10:
+        if i == 5:
             break
         else:
             i+= 1
@@ -747,9 +752,10 @@ while True:
 # print(scan_data, length)
 # scan_data, length = concat(scan_data, length, bytearray([240, 10, 0]), 24)
 # print(scan_data, length)
+
 jpeg_header.extend(scan_data)
 jpeg_header.extend(bytearray([0xFF, 0xD9]))
 # print(jpeg_header)
 
-with open("C:\\Users\\windows\\Desktop\\jpeg_file_from_fpga.jpg","wb") as f:
+with open("/home/madjid/Desktop/jpeg_file_from_fpga.jpg","wb") as f:
     f.write(jpeg_header)
