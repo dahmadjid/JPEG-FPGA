@@ -21,6 +21,7 @@ entity dct_block is
     clock,dct_start : in std_logic;
     dct_working : out std_logic;
     img_pixel : in sfixed(7 downto 0);
+    y_x_index : out integer range 0 to 63;
     dct_coeff_block : out dct_coeff_block_t
     --v_in,u_in : in unsigned(2 downto 0);
     --hex_1,hex_2 : out std_logic_vector(6 downto 0);
@@ -32,8 +33,8 @@ end dct_block ;
 architecture arch of dct_block is
     signal end_delay_count: integer range 0 to 3 := 0;
     signal clock_count : integer range 0 to 4;
-    signal y_x_index : unsigned(5 downto 0);
-    signal const_1,const_2,const_3 : sfixed(1 downto -20);
+    signal y_x_index_s : unsigned(5 downto 0);
+    signal const_1,const_2,const_3 : sfixed(1 downto -16);
     signal dct_working_s,dct_finished: std_logic := '0';
     signal y,x : integer range 0 to 7 := 0;
     signal img : image_block_t;
@@ -48,23 +49,23 @@ begin
 -- ("01111111","01111111","01111111","01111110","01111101","01111101","01111101","01111110"),
 -- ("01111110","01111110","01111111","01111110","01111110","01111101","01111101","01111101"));
 -- img_pixel <= img(y)(x);
-y_x_index_pr : process(dct_working_s,clock)
+y_x_index_s_pr : process(dct_working_s,clock)
 begin
     if dct_working_s = '0' then 
-        y_x_index <= "000000";
+        y_x_index_s <= "000000";
         dct_finished <= '0';
     elsif falling_edge(clock) and dct_working_s = '1' then
-        if y_x_index = "111111" then 
+        if y_x_index_s = "111111" then 
             dct_finished <= '1';
         else
-            y_x_index <= y_x_index + 1;
+            y_x_index_s <= y_x_index_s + 1;
         end if;
     end if;
-end process ; --y_x_index
+end process ; --y_x_index_s
 
-const_1 <="0000100000000000000000";  -- u,v = 0  1/8
-const_2 <="0000101101010000010011";  -- u or v = 0
-const_3 <="0001000000000000000000";  -- else 1/4
+const_1 <="000010000000000000";  -- u,v = 0  1/8
+const_2 <="000010110101000001";  -- u or v = 0
+const_3 <="000100000000000000";  -- else 1/4
 
 dct_working_s_pr : process(dct_start,dct_finished)
 begin
@@ -96,9 +97,9 @@ end process;
 --     end if;
 -- end process ; -- end_delay_count
 
-y <= to_integer(y_x_index(5 downto 3));
-x <= to_integer(y_x_index(2 downto 0));
-
+y <= to_integer(y_x_index_s(5 downto 3));
+x <= to_integer(y_x_index_s(2 downto 0));
+y_x_index <= to_integer(y_x_index_s);
 
 
 
@@ -122,7 +123,7 @@ end generate dct_v_gen;
 
 --dct_coeff <= dct_coeff_block(to_integer(v_in))(to_integer(u_in));
 dct_working <= dct_working_s;
--- with y_x_index(3 downto 0) select hex_1 <=
+-- with y_x_index_s(3 downto 0) select hex_1 <=
 -- 		"1000000" when "0000",	
 -- 		"1111001" when "0001",	
 -- 		"0100100" when "0010", 	 
@@ -140,7 +141,7 @@ dct_working <= dct_working_s;
 -- 		"0000110" when "1110",
 -- 		"0001110" when "1111",
 -- 		"1111111" when others;	
--- with y_x_index(5 downto 4) select hex_2 <=
+-- with y_x_index_s(5 downto 4) select hex_2 <=
 -- 		"1000000" when "00",	
 -- 		"1111001" when "01",	
 -- 		"0100100" when "10",

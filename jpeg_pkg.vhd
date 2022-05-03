@@ -174,6 +174,7 @@ package jpeg_pkg is
         clock,dct_start : in std_logic;
         dct_working : out std_logic;
         img_pixel : in sfixed(7 downto 0);
+        y_x_index : out integer range 0 to 63;
         dct_coeff_block : out dct_coeff_block_t
             -- v_in,u_in : in unsigned(2 downto 0);
             -- -- hex_1,hex_2 : out std_logic_vector(6 downto 0);
