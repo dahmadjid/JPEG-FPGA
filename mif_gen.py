@@ -39,7 +39,7 @@ def twosComp(bin_str):
 
 
 mif = "DEPTH = 262144;\nWIDTH = 8;\nADDRESS_RADIX = UNS;\nDATA_RADIX = BIN;\nCONTENT BEGIN\n"
-img = cv2.imread("img_16x16.bmp")
+img = cv2.imread("img.bmp")
 width = img.shape[1]
 height = img.shape[0]
 

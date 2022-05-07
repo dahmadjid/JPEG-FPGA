@@ -41,7 +41,7 @@ lumi_table = [16,11,10,	16,	24,	40,	51,	61,12,	12,	14,	19,	26,	58,	60,	55,14,	13
 
 chromi_table = [17,	18,	24,	47,	99,	99,	99,	99, 18,	21,	26,	66,	99,	99,	99,	99, 24,	26,	56,	99,	99,	99,	99,	99, 47,	66,	99,	99,	99, 99,	99,	99, 99,	99	,99,99,	99,	99,	99,	99, 99,	99,	99,	99	,99	,99	,99,99 ,99	,99	,99,	99,	99,	99,	99,	99, 99,	99,	99,	99,	99,	99,	99,	99]
 
-img = cv2.imread("img_16x16.bmp")
+img = cv2.imread("img_16x16_2.bmp")
 width = img.shape[1]
 height = img.shape[0]
 img = np.array(img,dtype = "int32")
@@ -70,19 +70,23 @@ for row_block_index in range(int(height/8)):
             
             dct_block = cv2.dct(np.array(block, dtype = "float32"))
             for i in range(8):
-                text += "("
+                # text += "("
                 for j in range(8):
                     
-                    # if channel == 0:
-                    #     dct_block[i,j] /= lumi_table[i*8 + j]
-                    # else:
-                    #     dct_block[i,j] /= chromi_table[i*8 + j]
+                    if channel == 0:
+                        dct_block[i,j] /= lumi_table[i*8 + j]
+                    else:
+                        dct_block[i,j] /= chromi_table[i*8 + j]
+                    
                     data = bin(abs(int(dct_block[i,j])))[2:].zfill(11)
-                    if dct_block[i,j] < 0:
+                    
+                    if int(dct_block[i,j]) < 0:
+
                         data = twosComp(data)
+                    # print(int(dct_block[i,j]), data)
                     # print(channel , ":", i*8 + j , " : ", dct_block[i,j], " : ",data)
                     text += f'"{data}", '
-                text = text[:-2] + " ), "
+                # text = text[:-2] + " ), "
             text = text[:-2] + ");\n" 
             count += 1
 
@@ -97,7 +101,8 @@ print(text)
 
 
 
-img = cv2.imread("/home/madjid/Desktop/jpeg_file_from_fpga.jpg")
+# img = cv2.imread("/home/madjid/Desktop/jpeg_file_from_fpga.jpg")
+img = cv2.imread("/home/madjid/Codes/JPEG FPGA/img_down.bmp")
 width = img.shape[1]
 height = img.shape[0]
 img = np.array(img,dtype = "int32")
@@ -112,17 +117,24 @@ for i in range(len(img)):
             print("FUCK")
 
 
-print(img[:,:,0])
+print(img[0:8,0:8,0])
 
-print(img[:,:,1])
+# print(img[:,:,1])
 
-print(img[:,:,2])
-print(cv2.dct(np.array(img[0:8,0:8,0], dtype = "float32"))[0,0]/16)
-print(cv2.dct(np.array(img[0:8,0:8,1], dtype = "float32"))[0,0]/17)
-print(cv2.dct(np.array(img[0:8,0:8,2], dtype = "float32"))[0,0]/17)
+# print(img[:,:,2])
+dct_block = cv2.dct(np.array(img[0:8,0:8,0], dtype = "float32"))
+                 
+for i in range(8):
+    for j in range(8):                  
+        dct_block[i,j] = int(dct_block[i,j] / lumi_table[i*8 + j])
 
-print(cv2.dct(np.array(img[0:8,8:,0], dtype = "float32"))[0,0]/16)
-print(cv2.dct(np.array(img[0:8,8:,1], dtype = "float32"))[0,0]/17)
-print(cv2.dct(np.array(img[0:8,8:,2], dtype = "float32"))[0,0]/17)
+print(dct_block)
+                   
+# print(cv2.dct(np.array(img[0:8,0:8,1], dtype = "float32"))[0,0]/17)
+# print(cv2.dct(np.array(img[0:8,0:8,2], dtype = "float32"))[0,0]/17)
+
+# print(cv2.dct(np.array(img[0:8,8:,0], dtype = "float32"))[0,0]/16)
+# print(cv2.dct(np.array(img[0:8,8:,1], dtype = "float32"))[0,0]/17)
+# print(cv2.dct(np.array(img[0:8,8:,2], dtype = "float32"))[0,0]/17)
 
 

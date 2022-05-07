@@ -502,6 +502,29 @@ HUFFMAN_CATEGORY_CODEWORD = {
 # text = text[:-3] + ');\n\n'
 # with open("huff_table.txt" ,'w') as f:
 #     f.write(text)
+
+# mif = "DEPTH = 262144;\nWIDTH = 8;\nADDRESS_RADIX = UNS;\nDATA_RADIX = BIN;\nCONTENT BEGIN\n"
+
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['LUMINANCE'].items():
+#     if str(length) in "EOBZRL":
+#         continue
+#     address = str(length[0] * 16 + length[1])
+#     data = bin(len(code))[2:].zfill(5) + code.zfill(16) 
+#     line = address + ' : ' + data + ";\n"
+#     mif+= line
+
+# for length,code in HUFFMAN_CATEGORY_CODEWORD['AC']['CHROMINANCE'].items():
+#     if str(length) in "EOBZRL":
+#         continue
+#     address = str(length[0] * 16 + length[1] + 256)
+#     data = bin(len(code))[2:].zfill(5) + code.zfill(16) 
+#     line = address + ' : ' + data + ";\n"
+#     mif+= line
+# mif += "END;"
+
+# with open("/home/madjid/Codes/JPEG FPGA/rom.mif", "w") as f:
+#     f.write(mif)
+
 # ------------------------------------------------------------------------------
 
 for key,value in HUFFMAN_CATEGORY_CODEWORD["DC"]["LUMINANCE"].items():
@@ -656,7 +679,7 @@ def shiftbybits(b_array, bits):
         return b_array
     modulo_bits = bits % 8
     bytes_num = int(bits / 8)
-    print(bytes_num, modulo_bits)
+    # print(bytes_num, modulo_bits)
     output_array = bytearray([0 for i in range(bytes_num)])  # bytes shifting
     output_array.extend(b_array)
     if modulo_bits != 0: 
@@ -720,6 +743,8 @@ while True:
 i = 0
 k = 0
 import time
+block_count = 0
+now = time.time()
 while True:
     if esp.in_waiting:
         
@@ -739,8 +764,9 @@ while True:
                 new_data.append(int(b))
         
         scan_data, scan_data_length = concat(scan_data, scan_data_length, new_data, length)
-        print(scan_data, scan_data_length)
+        print(block_count, scan_data, scan_data_length , "+", new_data, length)
         i = 0
+        block_count += 1
     else:
         if i == 5:
             break
@@ -759,3 +785,5 @@ jpeg_header.extend(bytearray([0xFF, 0xD9]))
 
 with open("/home/madjid/Desktop/jpeg_file_from_fpga.jpg","wb") as f:
     f.write(jpeg_header)
+
+print("image compressed in : ", time.time() - now - 5)

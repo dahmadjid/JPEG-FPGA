@@ -55,7 +55,7 @@ package jpeg_pkg is
         code : std_logic_vector(26 downto 0);
         code_length : integer range 1 to 27;
     end record;
-    type huff_code_table_t is array(0 to 63) of huff_code_t;
+    type huff_code_table_t is array(0 to 15) of huff_code_t;
     
     -- constant luminance_qz: image_block_t := (
     -- ("00010000","00001011","00001010","00010000","00011000","00101000","00110011","00111101"),
@@ -174,7 +174,6 @@ package jpeg_pkg is
         clock,dct_start : in std_logic;
         dct_working : out std_logic;
         img_pixel : in sfixed(7 downto 0);
-        y_x_index : out integer range 0 to 63;
         dct_coeff_block : out dct_coeff_block_t
             -- v_in,u_in : in unsigned(2 downto 0);
             -- -- hex_1,hex_2 : out std_logic_vector(6 downto 0);
